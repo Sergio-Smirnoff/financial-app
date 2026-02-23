@@ -1,0 +1,47 @@
+# Environment
+.env
+.env.local
+
+# Maven
+target/
+*.class
+*.jar
+*.war
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+
+# Node.js
+node_modules/
+.next/
+out/
+dist/
+.npm
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+
+# Logs
+*.log
+logs/
+
+# Nested git repositories (managed independently)
+back/financial-app-parent/
+back/ms-gateway/
+back/ms-users/
+back/ms-finances/
+back/ms-cards/
+back/ms-notifications/
+back/ms-upload/
+front/financial-app/
