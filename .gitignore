@@ -46,5 +46,9 @@ back/ms-notifications/
 back/ms-upload/
 front/financial-app/
 
+# Custom
+
+git-manager.sh
+
 CLAUDE.md
 
