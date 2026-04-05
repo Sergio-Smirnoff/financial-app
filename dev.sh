@@ -66,7 +66,7 @@ check_env() {
 INFRA_SERVICES="postgres zookeeper kafka minio"
 
 # ─── App services ─────────────────────────────────────────────────────────────
-APP_SERVICES="gateway service-users service-finances service-cards service-notifications service-upload frontend"
+APP_SERVICES="gateway service-users service-finances service-cards service-notifications service-upload service-investments frontend"
 
 # =============================================================================
 # Commands
@@ -92,7 +92,7 @@ cmd_local() {
         echo "  Example: ./dev.sh local service-finances"
         echo ""
         echo "  Available: service-users, service-finances, service-cards,"
-        echo "             service-notifications, service-upload, gateway"
+        echo "             service-notifications, service-upload, service-investments, gateway"
         exit 1
     fi
     local module
@@ -122,6 +122,12 @@ cmd_local() {
     echo "  DevTools auto-restart is active — save a file and it reloads."
     echo "  Press Ctrl+C to stop."
     echo ""
+
+    # Export .env vars so Maven picks them up as system env variables
+    while IFS= read -r line; do
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && export "$line"
+    done < "$SCRIPT_DIR/.env"
 
     cd "$SCRIPT_DIR/back/$module"
     mvn spring-boot:run
@@ -211,6 +217,7 @@ cmd_up() {
     echo "    Cards         → http://localhost:8083/swagger-ui.html"
     echo "    Notifications → http://localhost:8084/swagger-ui.html"
     echo "    Upload        → http://localhost:8085/swagger-ui.html"
+    echo "    Investments   → http://localhost:8086/swagger-ui.html"
     echo ""
     info "Run './dev.sh logs' to follow all logs."
 }
@@ -302,6 +309,7 @@ _service_to_module() {
         service-cards)         echo "ms-cards" ;;
         service-notifications) echo "ms-notifications" ;;
         service-upload)        echo "ms-upload" ;;
+        service-investments)   echo "ms-investments" ;;
         gateway)               echo "ms-gateway" ;;
         *) echo "" ;;
     esac
@@ -315,6 +323,7 @@ _service_port() {
         service-cards)         echo "8083" ;;
         service-notifications) echo "8084" ;;
         service-upload)        echo "8085" ;;
+        service-investments)   echo "8086" ;;
         gateway)               echo "8080" ;;
         *) echo "" ;;
     esac
@@ -359,7 +368,7 @@ cmd_help() {
     echo ""
     echo -e "  ${YELLOW}Service names:${RESET}"
     echo -e "  gateway, service-users, service-finances, service-cards,"
-    echo -e "  service-notifications, service-upload, frontend"
+    echo -e "  service-notifications, service-upload, service-investments, frontend"
     echo ""
     echo -e "  ${YELLOW}Dev Swagger UIs (./dev.sh up or ./dev.sh dev <svc>):${RESET}"
     echo -e "  http://localhost:8081/swagger-ui.html  (users)"
@@ -367,6 +376,7 @@ cmd_help() {
     echo -e "  http://localhost:8083/swagger-ui.html  (cards)"
     echo -e "  http://localhost:8084/swagger-ui.html  (notifications)"
     echo -e "  http://localhost:8085/swagger-ui.html  (upload)"
+    echo -e "  http://localhost:8086/swagger-ui.html  (investments)"
     echo ""
 }
 

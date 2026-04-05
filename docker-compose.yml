@@ -82,6 +82,7 @@ services:
       CARDS_SERVICE_URL: ${CARDS_SERVICE_URL}
       NOTIFICATIONS_SERVICE_URL: ${NOTIFICATIONS_SERVICE_URL}
       UPLOAD_SERVICE_URL: ${UPLOAD_SERVICE_URL}
+      INVESTMENTS_SERVICE_URL: ${INVESTMENTS_SERVICE_URL}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
     depends_on:
       - service-users
@@ -89,6 +90,7 @@ services:
       - service-cards
       - service-notifications
       - service-upload
+      - service-investments
     networks:
       - internal
     restart: unless-stopped
@@ -193,6 +195,24 @@ services:
       - postgres
       - kafka
       - minio
+    networks:
+      - internal
+    restart: unless-stopped
+
+  service-investments:
+    profiles: [app]
+    build:
+      context: ./back
+      dockerfile: ms-investments/Dockerfile
+    container_name: service-investments
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=investments
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      IOL_USERNAME: ${IOL_USERNAME}
+      IOL_PASSWORD: ${IOL_PASSWORD}
+    depends_on:
+      - postgres
     networks:
       - internal
     restart: unless-stopped
