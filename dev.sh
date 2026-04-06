@@ -129,6 +129,16 @@ cmd_local() {
         [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && export "$line"
     done < "$SCRIPT_DIR/.env"
 
+    # Override Docker-internal hostnames with localhost equivalents for local dev
+    export KAFKA_BOOTSTRAP_SERVERS="localhost:9093"
+    export DB_URL="jdbc:postgresql://localhost:5432/financialapp?currentSchema=$(_service_schema "$svc")"
+    export USERS_SERVICE_URL="http://localhost:8081"
+    export FINANCES_SERVICE_URL="http://localhost:8082"
+    export CARDS_SERVICE_URL="http://localhost:8083"
+    export NOTIFICATIONS_SERVICE_URL="http://localhost:8084"
+    export UPLOAD_SERVICE_URL="http://localhost:8085"
+    export INVESTMENTS_SERVICE_URL="http://localhost:8086"
+
     cd "$SCRIPT_DIR/back/$module"
     mvn spring-boot:run
 }
@@ -312,6 +322,20 @@ _service_to_module() {
         service-investments)   echo "ms-investments" ;;
         gateway)               echo "ms-gateway" ;;
         *) echo "" ;;
+    esac
+}
+
+# ─── Internal: resolve schema for a given service ────────────────────────────
+_service_schema() {
+    case "$1" in
+        service-users)         echo "users" ;;
+        service-finances)      echo "finances" ;;
+        service-cards)         echo "cards" ;;
+        service-notifications) echo "notifications" ;;
+        service-upload)        echo "upload" ;;
+        service-investments)   echo "investments" ;;
+        gateway)               echo "public" ;;
+        *) echo "public" ;;
     esac
 }
 
