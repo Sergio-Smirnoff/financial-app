@@ -1,6 +1,9 @@
 # Environment
 .env
 .env.local
+.claude
+package-lock.json
+package.json
 
 # Maven
 target/
