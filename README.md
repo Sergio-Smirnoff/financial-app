@@ -10,15 +10,16 @@ Personal financial management application built with a microservices architectur
 
 ## Services
 
-| Service       | Port | Dev Swagger UI                            | Description                   |
-|---------------|------|-------------------------------------------|-------------------------------|
-| Frontend      | 3000 | —                                         | Next.js application           |
-| Gateway       | 8080 | http://localhost:8080/swagger-ui.html     | API Gateway + JWT validation  |
-| Users         | 8081 | http://localhost:8081/swagger-ui.html     | Authentication & user profile |
-| Finances      | 8082 | http://localhost:8082/swagger-ui.html     | Transactions, loans, expenses |
-| Cards         | 8083 | http://localhost:8083/swagger-ui.html     | Credit/debit card management  |
-| Notifications | 8084 | http://localhost:8084/swagger-ui.html     | Alerts, email, SSE            |
-| Upload        | 8085 | http://localhost:8085/swagger-ui.html     | File upload + PDF parsing     |
+| Service       | Port | Dev Swagger UI                            | Description                          |
+|---------------|------|-------------------------------------------|--------------------------------------|
+| Frontend      | 3000 | —                                         | Next.js application                  |
+| Gateway       | 8080 | http://localhost:8080/swagger-ui.html     | API Gateway + JWT validation         |
+| Users         | 8081 | http://localhost:8081/swagger-ui.html     | Authentication & user profile        |
+| Finances      | 8082 | http://localhost:8082/swagger-ui.html     | Transactions, loans, expenses        |
+| Cards         | 8083 | http://localhost:8083/swagger-ui.html     | Credit/debit card management         |
+| Notifications | 8084 | http://localhost:8084/swagger-ui.html     | Alerts, email, SSE                   |
+| Upload        | 8085 | http://localhost:8085/swagger-ui.html     | File upload + PDF parsing            |
+| Investments   | 8086 | http://localhost:8086/swagger-ui.html     | Portfolio tracking + IOL price feeds |
 
 In production (`./dev.sh prod`), only Gateway (8080) and Frontend (3000) are exposed. In dev mode, all service ports are accessible for direct Swagger UI access.
 
@@ -76,7 +77,7 @@ All common operations are available through the `dev.sh` script at the project r
 
 ```
 gateway  service-users  service-finances  service-cards
-service-notifications  service-upload  frontend
+service-notifications  service-upload  service-investments  frontend
 ```
 
 ### Common workflows
@@ -143,13 +144,14 @@ Builds the image, starts the service, and follows its logs. Requires rebuild on 
 | Stage | Component | Status |
 |---|---|---|
 | 1 | Base infrastructure | ✅ Done |
-| 2 | Users service + JWT | ⬜ Pending |
-| 3 | API Gateway | ⬜ Pending |
-| 4 | Frontend base | ⬜ Pending |
+| 2 | Users service + JWT | ✅ Done |
+| 3 | API Gateway | ✅ Done |
+| 4 | Frontend | ✅ Done |
 | 5 | Cards service | ⬜ Pending |
 | 6 | Finances service | ✅ Done |
 | 7 | Notifications service + SSE | ⬜ Pending |
 | 8 | Upload service + PDF parsers | ⬜ Pending |
+| — | Investments service | ✅ Done |
 
 ---
 

@@ -77,6 +77,7 @@ services:
       - "8080:8080"
     environment:
       JWT_SECRET: ${JWT_SECRET}
+      JWT_ENABLED: ${JWT_ENABLED:-true}
       USERS_SERVICE_URL: ${USERS_SERVICE_URL}
       FINANCES_SERVICE_URL: ${FINANCES_SERVICE_URL}
       CARDS_SERVICE_URL: ${CARDS_SERVICE_URL}
@@ -109,6 +110,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION: ${JWT_EXPIRATION}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     depends_on:
       - postgres
       - kafka
