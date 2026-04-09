@@ -54,62 +54,88 @@ That's it. The script builds all images, starts the infrastructure, waits for Po
 All common operations are available through the `dev.sh` script at the project root.
 
 ```
-./dev.sh <command> [service]
+./dev.sh <command> [options]
 ```
+
+### Local — all services in background (recommended)
+
+| Command | Description |
+|---|---|
+| `./dev.sh local-all` | Infra + default services in background, logs to `./logs/` |
+| `./dev.sh local-all service-users gateway` | Same, but only the specified services |
+| `./dev.sh local-all --front` | Include the frontend |
+| `./dev.sh stop-all` | Kill all local background processes |
+| `./dev.sh logs-local` | `tail -f` all log files in `./logs/` |
+| `./dev.sh logs-local service-finances` | `tail -f` a specific log file |
+| `./dev.sh status-local` | Show which background processes are alive |
+
+Default services (when none are specified): `service-users`, `service-finances`, `service-investments`, `gateway`.
+Startup order: all non-gateway services in parallel → health checks → gateway → frontend (if `--front`).
+Log files: `./logs/<service>.log` (truncated on each start). PIDs tracked in `.dev-pids`.
+
+### Local — single service, foreground
+
+| Command | Description |
+|---|---|
+| `./dev.sh local <service>` | Infra + run one service with Maven (hot reload, Ctrl+C to stop) |
+| `./dev.sh front` | Infra + run frontend with npm (hot reload, Ctrl+C to stop) |
+
+### Docker
 
 | Command | Description |
 |---|---|
 | `./dev.sh infra` | Start infrastructure only (postgres, kafka, minio) |
-| `./dev.sh local <service>` | Infra + run service locally with Maven (**hot reload**) |
-| `./dev.sh front` | Infra + run frontend locally with npm (**hot reload**) |
 | `./dev.sh dev <service>` | Infra + build + run a single service in Docker |
-| `./dev.sh up` | Build + start **all** services in Docker |
+| `./dev.sh up` | Build + start **all** services in Docker (ports exposed) |
+| `./dev.sh prod` | Build + start **all** services in Docker (only 8080/3000 exposed) |
 | `./dev.sh down` | Stop and remove all containers |
-| `./dev.sh build <service>` | Rebuild a specific service image |
-| `./dev.sh build` | Rebuild all app images |
-| `./dev.sh restart <service>` | Restart a specific service |
-| `./dev.sh restart` | Restart all app services |
-| `./dev.sh logs <service>` | Follow logs for a specific service |
-| `./dev.sh logs` | Follow logs for all services |
+| `./dev.sh build [service]` | Rebuild all or a specific image |
+| `./dev.sh restart [service]` | Restart all or a specific container |
+| `./dev.sh logs [service]` | Follow Docker logs (all or specific) |
 | `./dev.sh status` | Show running containers |
 
 ### Service names
 
 ```
 gateway  service-users  service-finances  service-cards
-service-notifications  service-upload  service-investments  frontend
+service-notifications  service-upload  service-investments
 ```
 
 ### Common workflows
 
-**Local development with hot reload (recommended):**
-
-The fastest dev loop. Infrastructure runs in Docker, services run locally with auto-restart on code changes.
+**All services locally, single command (recommended):**
 
 ```bash
-# Terminal 1: backend service (starts infra + runs with auto-restart on save, ~2-5s)
-./dev.sh local service-finances
+# Start everything in the background — terminal stays free
+./dev.sh local-all --front
 
-# Terminal 2: frontend (starts infra + runs with instant HMR in the browser)
-./dev.sh front
+# Tail logs of a specific service
+./dev.sh logs-local service-finances
+
+# Stop everything
+./dev.sh stop-all
 ```
 
-Each command starts the infrastructure automatically if it's not already running. No need to run `./dev.sh infra` separately.
+Startup sequence: infra (Docker) → non-gateway services in parallel → `/actuator/health` checks → gateway → frontend.
 
-Save a `.java` file → Spring Boot DevTools recompiles and restarts (~2-5s).
-Save a `.tsx` file → Next.js applies the change instantly in the browser.
+**Requirements:** Java 21, Maven 3.9+, Node.js 22+, `curl`
 
-**Requirements:** Java 21, Maven 3.9+, Node.js 22+
+> **Note:** Kafka exposes port `9093` to the host for local dev. Docker containers use the internal `kafka:9092`. `dev.sh` sets `KAFKA_BOOTSTRAP_SERVERS=localhost:9093` automatically.
 
-All `application.yml` files have sensible localhost defaults, so no env vars are needed for local dev. The parent POM is installed automatically by Maven on first run.
+**Single service with hot reload (foreground):**
 
-> **Note:** Kafka exposes port `9093` to the host for local dev (`localhost:9093`). Docker containers use the internal `kafka:9092`. The defaults in each `application.yml` already point to `localhost:9093`.
+```bash
+# Backend — Spring Boot DevTools recompiles on save (~2-5s)
+./dev.sh local service-finances
+
+# Frontend — Next.js HMR applies changes instantly
+./dev.sh front
+```
 
 **Run a single service in Docker (no local Java needed):**
 ```bash
 ./dev.sh dev service-finances
 ```
-Builds the image, starts the service, and follows its logs. Requires rebuild on code changes.
 
 **Rebuild and restart after a code change (Docker mode):**
 ```bash
@@ -120,16 +146,6 @@ Builds the image, starts the service, and follows its logs. Requires rebuild on 
 **Start all services in Docker:**
 ```bash
 ./dev.sh up
-```
-
-**Check what's running:**
-```bash
-./dev.sh status
-```
-
-**Tail logs of a specific service:**
-```bash
-./dev.sh logs service-finances
 ```
 
 **Tear everything down:**

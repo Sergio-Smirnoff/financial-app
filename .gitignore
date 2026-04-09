@@ -53,6 +53,7 @@ front/financial-app/
 # Custom
 
 git-manager.sh
+.dev-pids
 
 CLAUDE.md
 
