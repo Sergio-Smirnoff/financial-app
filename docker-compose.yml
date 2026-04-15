@@ -229,6 +229,8 @@ services:
     profiles: [app]
     build:
       context: ./front/financial-app
+      args:
+        NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL}
     container_name: frontend
     ports:
       - "3000:3000"
