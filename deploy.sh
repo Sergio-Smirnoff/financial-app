@@ -65,7 +65,8 @@ error() { echo -e "${RED}[error]${NC} $*" >&2; }
 # Verify GitHub SSH access
 # ---------------------------------------------------------------------------
 info "Verifying GitHub SSH access..."
-if ! ssh -o StrictHostKeyChecking=no -o BatchMode=yes -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+ssh_output=$(ssh -o StrictHostKeyChecking=no -T git@github.com 2>&1 || true)
+if ! echo "$ssh_output" | grep -q "successfully authenticated"; then
   error "SSH key not authorized for GitHub."
   echo ""
   echo "  On this server, run:"
