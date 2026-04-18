@@ -70,13 +70,13 @@ check_env() {
 INFRA_SERVICES="postgres zookeeper kafka minio"
 
 # ─── App services ─────────────────────────────────────────────────────────────
-APP_SERVICES="gateway service-users service-finances service-cards service-notifications service-upload service-investments frontend"
+APP_SERVICES="gateway service-users service-finances service-banks service-notifications service-upload service-investments frontend"
 
 # ─── Local-all constants ──────────────────────────────────────────────────────
 LOGS_DIR="$SCRIPT_DIR/logs"
 PIDS_FILE="$SCRIPT_DIR/.dev-pids"
 # Non-skeleton services started by default (gateway always last)
-DEFAULT_LOCAL_SERVICES="service-users service-notifications service-finances service-investments gateway"
+DEFAULT_LOCAL_SERVICES="service-users service-notifications service-finances service-investments service-banks gateway"
 
 # =============================================================================
 # Commands
@@ -101,7 +101,7 @@ cmd_local() {
         error "Usage: ./dev.sh local <service>"
         echo "  Example: ./dev.sh local service-finances"
         echo ""
-        echo "  Available: service-users, service-finances, service-cards,"
+        echo "  Available: service-users, service-finances, service-banks,"
         echo "             service-notifications, service-upload, service-investments, gateway"
         exit 1
     fi
@@ -144,7 +144,7 @@ cmd_local() {
     export DB_URL="jdbc:postgresql://localhost:5432/financialapp?currentSchema=$(_service_schema "$svc")"
     export USERS_SERVICE_URL="http://localhost:8081"
     export FINANCES_SERVICE_URL="http://localhost:8082"
-    export CARDS_SERVICE_URL="http://localhost:8083"
+    export BANKS_SERVICE_URL="http://localhost:8083"
     export NOTIFICATIONS_SERVICE_URL="http://localhost:8084"
     export UPLOAD_SERVICE_URL="http://localhost:8085"
     export INVESTMENTS_SERVICE_URL="http://localhost:8086"
@@ -347,7 +347,7 @@ cmd_local_all() {
         mod=$(_service_to_module "$svc")
         if [[ -z "$mod" ]]; then
             error "Unknown service: $svc"
-            echo "  Valid: gateway, service-users, service-finances, service-cards,"
+            echo "  Valid: gateway, service-users, service-finances, service-banks,"
             echo "         service-notifications, service-upload, service-investments"
             exit 1
         fi
@@ -520,7 +520,7 @@ _start_bg() {
         export DB_URL="jdbc:postgresql://localhost:5432/financialapp?currentSchema=${schema}"
         export USERS_SERVICE_URL="http://localhost:8081"
         export FINANCES_SERVICE_URL="http://localhost:8082"
-        export CARDS_SERVICE_URL="http://localhost:8083"
+        export BANKS_SERVICE_URL="http://localhost:8083"
         export NOTIFICATIONS_SERVICE_URL="http://localhost:8084"
         export UPLOAD_SERVICE_URL="http://localhost:8085"
         export INVESTMENTS_SERVICE_URL="http://localhost:8086"
@@ -596,7 +596,7 @@ _service_to_module() {
     case "$1" in
         service-users)         echo "ms-users" ;;
         service-finances)      echo "ms-finances" ;;
-        service-cards)         echo "ms-cards" ;;
+        service-banks)         echo "ms-banks" ;;
         service-notifications) echo "ms-notifications" ;;
         service-upload)        echo "ms-upload" ;;
         service-investments)   echo "ms-investments" ;;
@@ -610,7 +610,7 @@ _service_schema() {
     case "$1" in
         service-users)         echo "users" ;;
         service-finances)      echo "finances" ;;
-        service-cards)         echo "cards" ;;
+        service-banks)         echo "cards" ;;
         service-notifications) echo "notifications" ;;
         service-upload)        echo "upload" ;;
         service-investments)   echo "investments" ;;
@@ -624,7 +624,7 @@ _service_port() {
     case "$1" in
         service-users)         echo "8081" ;;
         service-finances)      echo "8082" ;;
-        service-cards)         echo "8083" ;;
+        service-banks)         echo "8083" ;;
         service-notifications) echo "8084" ;;
         service-upload)        echo "8085" ;;
         service-investments)   echo "8086" ;;
@@ -680,7 +680,7 @@ cmd_help() {
     echo -e "  ${CYAN}./dev.sh status${RESET}                               Show container status"
     echo ""
     echo -e "  ${YELLOW}Service names:${RESET}"
-    echo -e "  gateway, service-users, service-finances, service-cards,"
+    echo -e "  gateway, service-users, service-finances, service-banks,"
     echo -e "  service-notifications, service-upload, service-investments"
     echo ""
     echo -e "  ${YELLOW}Default local-all services:${RESET} $DEFAULT_LOCAL_SERVICES"
