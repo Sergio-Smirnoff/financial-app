@@ -80,7 +80,7 @@ services:
       JWT_ENABLED: ${JWT_ENABLED:-true}
       USERS_SERVICE_URL: ${USERS_SERVICE_URL}
       FINANCES_SERVICE_URL: ${FINANCES_SERVICE_URL}
-      CARDS_SERVICE_URL: ${CARDS_SERVICE_URL}
+      BANKS_SERVICE_URL: ${BANKS_SERVICE_URL}
       NOTIFICATIONS_SERVICE_URL: ${NOTIFICATIONS_SERVICE_URL}
       UPLOAD_SERVICE_URL: ${UPLOAD_SERVICE_URL}
       INVESTMENTS_SERVICE_URL: ${INVESTMENTS_SERVICE_URL}
@@ -88,7 +88,7 @@ services:
     depends_on:
       - service-users
       - service-finances
-      - service-cards
+      - service-banks
       - service-notifications
       - service-upload
       - service-investments
@@ -125,9 +125,9 @@ services:
       dockerfile: ms-finances/Dockerfile
     container_name: service-finances
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=finances
-      DB_USERNAME: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
     depends_on:
       - postgres
@@ -136,16 +136,16 @@ services:
       - internal
     restart: unless-stopped
 
-  service-cards:
+  service-banks:
     profiles: [app]
     build:
       context: ./back
-      dockerfile: ms-cards/Dockerfile
-    container_name: service-cards
+      dockerfile: ms-banks/Dockerfile
+    container_name: service-banks
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=banks
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
     depends_on:
       - postgres

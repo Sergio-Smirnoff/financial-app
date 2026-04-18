@@ -24,7 +24,7 @@ services:
     ports:
       - "8082:8082"
 
-  service-cards:
+  service-banks:
     ports:
       - "8083:8083"
 
