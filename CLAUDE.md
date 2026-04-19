@@ -166,4 +166,4 @@ Flyway migrations in `ms-investments`: V1 (init), V2 (threshold fields), V3 (per
 - Build context for all Java services is `./back` (Dockerfiles reference the parent pom + service src).
 
 
-To continue: claude --resume "btw: Why its taking so long? (Branch)"
+The development workfow is first making a branch in the repositories changes need to be made, then when is all working pass all the changes from that branch to the develop branch.This must be replicated everytime we are developing a new change, branching from master, the production branch => into a new branch with the name of the change. After finishing the development, merge into develop.

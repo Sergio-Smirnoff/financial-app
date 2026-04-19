@@ -5,6 +5,7 @@
 .claude
 package-lock.json
 package.json
+docs/superpowers
 
 # Maven
 target/
