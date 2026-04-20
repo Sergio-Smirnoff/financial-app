@@ -234,7 +234,7 @@ cmd_up() {
     echo "  Swagger UIs (dev only):"
     echo "    Users         → http://localhost:8081/swagger-ui.html"
     echo "    Finances      → http://localhost:8082/swagger-ui.html"
-    echo "    Cards         → http://localhost:8083/swagger-ui.html"
+    echo "    Banks         → http://localhost:8083/swagger-ui.html"
     echo "    Notifications → http://localhost:8084/swagger-ui.html"
     echo "    Upload        → http://localhost:8085/swagger-ui.html"
     echo "    Investments   → http://localhost:8086/swagger-ui.html"
@@ -610,7 +610,7 @@ _service_schema() {
     case "$1" in
         service-users)         echo "users" ;;
         service-finances)      echo "finances" ;;
-        service-banks)         echo "cards" ;;
+        service-banks)         echo "banks" ;;
         service-notifications) echo "notifications" ;;
         service-upload)        echo "upload" ;;
         service-investments)   echo "investments" ;;
@@ -688,7 +688,7 @@ cmd_help() {
     echo -e "  ${YELLOW}Swagger UIs:${RESET}"
     echo -e "  http://localhost:8081/swagger-ui.html  (users)"
     echo -e "  http://localhost:8082/swagger-ui.html  (finances)"
-    echo -e "  http://localhost:8083/swagger-ui.html  (cards)"
+    echo -e "  http://localhost:8083/swagger-ui.html  (banks)"
     echo -e "  http://localhost:8084/swagger-ui.html  (notifications)"
     echo -e "  http://localhost:8085/swagger-ui.html  (upload)"
     echo -e "  http://localhost:8086/swagger-ui.html  (investments)"
