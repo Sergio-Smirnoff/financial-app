@@ -1,45 +1,46 @@
-# Bug Fix Implementation Plan
+# Cards UI/UX Improvement Plan
 
-This plan addresses the bugs reported in `docs/notes.txt`.
+This plan addresses the current issues with the credit cards UI as requested by the user.
 
 ## Objective
-Fix 6 UI/UX bugs in the frontend application to improve user experience and error handling.
+Improve the visualization of card installments by grouping them into "purchases", update the card actions menu, and provide a comprehensive card details popup.
 
 ## Key Files & Context
-- `front/financial-app/lib/hooks/useLoans.ts` (Installment updates)
-- `front/financial-app/lib/hooks/useBanks.ts` (Bank/Account mutations)
-- `front/financial-app/components/pages/banks/BankDetailContent.tsx` (Account list, UI buttons, Bank notifications)
-- `front/financial-app/components/pages/banks/QuickTransactionDialog.tsx` (Deposit/Withdraw categories)
+- `front/financial-app/components/pages/banks/CardList.tsx`
+- `front/financial-app/components/pages/banks/CardFormDialog.tsx`
+- `front/financial-app/components/pages/banks/CardDetailDialog.tsx` (New/Renamed from CardInstallmentsDialog)
+- `front/financial-app/lib/hooks/useCards.ts`
+- `front/financial-app/lib/api/cards.ts`
 
 ## Implementation Steps
 
-1. **Fix Installments payment not debiting instantly:**
-   - In `front/financial-app/lib/hooks/useLoans.ts`, locate `usePayLoanInstallment`.
-   - Update the `onSuccess` callback to include `queryClient.invalidateQueries({ queryKey: ['banks'] })` so the account balance updates instantly.
+### Task 1: Update Card APIs & Hooks
+1. In `cards.ts` API client, add an `update` method for cards.
+2. In `useCards.ts`, add a `useUpdateCard` mutation.
+3. In `useCards.ts`, update `useDeleteCard` to include an `onError` handler that displays a toast message if the API rejects the deletion (e.g., because there are pending installments).
 
-2. **Add UI Error when deleting a bank fails:**
-   - In `front/financial-app/lib/hooks/useBanks.ts`, locate `deleteBankMutation`.
-   - Add an `onError` handler that uses `toast.error(error.message || 'Failed to delete bank')` to display the `ApiError` to the user.
+### Task 2: Refactor CardList Component
+1. In `CardList.tsx`, update the 3-dots DropdownMenu to only contain **Edit Card** and **Delete Card**.
+2. Add a new state `editingCard: Card | null` and pass it to `CardFormDialog`.
+3. Update the main card container `div` to be clickable (`onClick`), opening the new `CardDetailDialog` for the selected card.
 
-3. **Add Option to delete accounts:**
-   - In `front/financial-app/components/pages/banks/BankDetailContent.tsx`, locate the account card rendering map (`bank.accounts.map(...)`).
-   - Add a Delete button (Trash2 icon) next to the History button.
-   - Wire it to an `openConfirmDelete` dialog from `useUiStore`, and call `deleteAccount` from `useAccounts` upon confirmation.
+### Task 3: Support Card Editing
+1. In `CardFormDialog.tsx`, add an `editCard?: Card | null` prop.
+2. Pre-fill the form with `editCard` data if provided (using `useEffect` to reset the form when `editCard` changes).
+3. On submit, conditionally call the update mutation if editing, or the create mutation if creating a new card.
 
-4. **Fix Deposit/Withdraw categories dropdown:**
-   - Investigate `QuickTransactionDialog.tsx` to ensure the category dropdown correctly fetches and displays the application's actual categories (income/expense) instead of hardcoded or incorrect values. Ensure the mapping from `categories` to `flatSubcategories` works correctly and is bound to the form correctly.
-
-5. **Fix Bank notification bell:**
-   - In `BankDetailContent.tsx`, locate the non-interactive bell icon for the specific bank.
-   - Wrap it in a `DropdownMenu` or `Dialog` (similar to the global `NotificationBell.tsx`) that displays a filtered list of `useLatestNotifications()` where `metadata.bankId === bankId`.
-
-6. **Remove top "Add Account" button:**
-   - In `BankDetailContent.tsx`, locate the top `<Button onClick={handleAddAccount}>` and remove it, leaving only the "Add another account" dashed button at the bottom of the account list.
+### Task 4: Create CardDetailDialog (Replaces CardInstallmentsDialog)
+1. Create or rename to `CardDetailDialog.tsx`.
+2. Fetch installments using `useCardInstallments(cardId)`.
+3. **Basic Info Header:** Display card brand, last 4 digits, and behavior. Add an "Add Expense" button to this header or a toolbar.
+4. **Group Purchases:** Group the fetched installments by `description`, `totalAmount`, `currency`, and `totalInstallments`. Render an accordion list for these purchases.
+5. **Installments per Purchase:** Inside each accordion item, display the installments specific to that purchase, keeping the current functionality (info, "Mark paid" button).
+6. **Upcoming Expirations:** At the bottom of the dialog, filter the installments to find those with `dueDate` in less than 3 days and `!paid`. Display them in a separate "Próximos Vencimientos" section.
 
 ## Verification & Testing
-- Pay an installment and verify the associated bank account balance updates instantly without reloading.
-- Attempt to delete a bank with a non-zero balance and verify a red error toast appears with the correct message.
-- Delete an account and verify it disappears from the list.
-- Open a Deposit/Withdraw dialog and verify the categories dropdown shows the correct app categories.
-- Click the notification bell on a bank page and verify it shows the correct bank-specific notifications.
-- Verify the top "Add Account" button is gone.
+- Ensure the 3-dots menu only shows Edit/Delete.
+- Verify attempting to delete a card with pending installments shows a clear error toast.
+- Verify editing a card successfully updates its information.
+- Verify clicking a card opens the new details popup.
+- Confirm installments are correctly grouped by their corresponding purchase details.
+- Confirm "Próximos Vencimientos" accurately filters and displays installments due within 3 days.
