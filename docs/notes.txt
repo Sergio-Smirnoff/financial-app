@@ -1,0 +1,11 @@
+
+- Cuando pago installments no se me debita instantaneamente la plata tengo que recargar la pagina
+- NO salta error en la UI cuando intento borrar un banco con accounts: Uncaught (in promise) ApiError: Cannot delete account with non-zero balance: 99999979990.00
+    at apiFetch (client.ts:66:11)
+
+- No tengo una opcion para eliminar accounts.
+- Las categorias de los deposits y los withdraw no estan relacionadas a las categorias de la aplicacion, deberia aparecer un dropdown con esas categorias
+- Las campanas de notificaciones de los bancos no muestran las notificaciones recientes del banco
+- Eliminar el boton de add account arriba de todo, solo dejar el que esta en la columna con las accounts, abajo de ellas.
+
+
