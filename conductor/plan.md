@@ -1,68 +1,60 @@
-# Bank-Level Cards and Loans UI Redesign Plan
+# Account Filters Implementation Plan
 
-This plan documents the migration of Cards and Loans from being Account-level entities to Bank-level entities, including a UI redesign for the Bank Details page.
+## Background & Motivation
+The user currently has multiple accounts within a bank, making it difficult to find specific ones (e.g., finding only USD accounts, hiding unused/empty accounts, or filtering by type such as SAVINGS).
 
 ## Objective
-Decouple Credit Cards and Loans from specific accounts, allowing them to belong directly to a Bank. Enable users to choose which account to use when paying installments. Redesign the Bank Details page to accommodate this new structure.
+Implement a filtering toolbar in the Bank Details page (`BankDetailContent.tsx`) above the accounts list. The toolbar will allow users to filter accounts by name, currency, type, and balance status.
 
 ## Key Files & Context
-- **Frontend (`front/financial-app/`)**:
-  - `types/cards.ts`, `types/loans.ts`
-  - `lib/api/cards.ts`, `lib/api/loans.ts`
-  - `lib/hooks/useCards.ts`, `lib/hooks/useLoans.ts`
-  - `components/pages/banks/BankDetailContent.tsx` (Main layout change)
-  - `components/pages/banks/CardList.tsx`, `components/pages/banks/CardFormDialog.tsx`
-  - `components/pages/banks/CardDetailDialog.tsx` (Add account selector for payment)
-  - `components/pages/loans/LoanList.tsx`, `components/pages/loans/LoanForm.tsx`, `components/pages/loans/LoansContent.tsx`
-- **Backend (`back/ms-banks/` & `back/ms-finances/`)**:
-  - Entities: `Card`, `Loan` (Move `accountId` to `bankId`)
-  - Controllers/Services: Update creation and listing logic.
-  - Payment Endpoints: Update `payInstallment` endpoints to accept an `accountId` as the funding source for the payment transaction.
+- `front/financial-app/components/pages/banks/BankDetailContent.tsx`
+
+## Scope & Impact
+This is a purely frontend change. It affects only the rendering logic of the accounts array in `BankDetailContent.tsx`. No backend API changes or database migrations are required.
+
+## Proposed Solution
+
+1. **State Management:**
+   - Add state variables in `BankDetailContent.tsx`:
+     - `searchQuery` (string, default: '')
+     - `filterCurrency` (string, default: 'ALL')
+     - `filterType` (string, default: 'ALL')
+     - `hideEmptyAccounts` (boolean, default: false)
+
+2. **Filtering Logic:**
+   - Use `useMemo` to derive a `filteredAccounts` array from `bank.accounts`.
+   - Apply filters sequentially:
+     - *Name:* Match `searchQuery` case-insensitively against `account.name`.
+     - *Currency:* Match `filterCurrency` against `account.currency` (if not 'ALL').
+     - *Type:* Match `filterType` against `account.type` (if not 'ALL').
+     - *Empty Accounts:* If `hideEmptyAccounts` is true, exclude accounts where `account.balance === 0`.
+
+3. **UI Components (Toolbar):**
+   - Above the `<section className="space-y-4">` for Accounts, add a new `<div className="flex flex-wrap gap-4 items-center">`.
+   - Use Shadcn UI components:
+     - `<Input>` for the search bar (with a magnifying glass icon placeholder).
+     - `<Select>` for Currency (e.g., ALL, USD, ARS). Determine options dynamically from the available accounts or statically if preferred (ARS, USD, EUR).
+     - `<Select>` for Type (e.g., ALL, CHECKING, SAVINGS, INVESTMENT, CASH).
+     - `<div className="flex items-center space-x-2">` containing a `<Switch>` for "Hide empty accounts".
+     - A `<Button variant="ghost">` or icon to reset all filters.
+
+4. **Rendering:**
+   - Update the mapping from `bank.accounts.map` to `filteredAccounts.map`.
+   - Show a fallback message (e.g., "No accounts match your filters") if `filteredAccounts.length === 0` but `bank.accounts.length > 0`.
 
 ## Implementation Steps
 
-### Phase 1: Backend Architecture Changes (ms-banks)
-1. **Database & Entities:**
-   - Update `Card` entity: Replace `accountId` with `bankId`.
-   - Update `Loan` entity: Replace `accountId` with `bankId`.
-   - Create/Update Liquibase or Flyway migrations (if used) or update Hibernate schema generation.
-2. **DTOs & Controllers:**
-   - Update `CardRequest` and `LoanRequest` DTOs to receive `bankId` instead of `accountId`.
-   - Update `CardController` and `LoanController` listing endpoints (`GET`) to filter by `bankId`.
-3. **Payment Logic:**
-   - Update `payInstallment` endpoints for both Cards and Loans to require an `accountId` as a request parameter or body field.
-   - The backend must verify that the provided `accountId` belongs to the same user and has sufficient funds (and matches the currency) before recording the payment in `ms-finances`.
-
-### Phase 2: Frontend Data Layer & Types
-1. **Types:**
-   - Update `Card` and `Loan` interfaces in `types/cards.ts` and `types/loans.ts` to use `bankId`.
-   - Update `CardRequest` and `LoanRequest`.
-2. **API Clients & Hooks:**
-   - Update `cardsApi.list` and `loansApi.list` to accept `bankId`.
-   - Update `useCards(bankId)` and `useLoans(bankId)`.
-   - Update `markPaid` mutations to accept `accountId` as an argument.
-
-### Phase 3: Bank Details UI Redesign
-1. **Layout (`BankDetailContent.tsx`):**
-   - **Header:** Remains at the top.
-   - **Accounts Section:** Render the list of accounts below the header, spanning the full width. Remove the nested rendering of `CardList` and `LoanList` inside each account card.
-   - **Cards & Loans Grid:** Below the accounts, create a CSS grid `grid-cols-1 lg:grid-cols-2 gap-6`.
-   - Place `<CardList bankId={bank.id} />` in the left column.
-   - Place `<LoanList bankId={bank.id} />` in the right column.
-
-### Phase 4: Payment UI & Account Selection
-1. **Select Account Dropdown:**
-   - In `CardDetailDialog.tsx` and `LoansContent.tsx`, next to the "Pay" button for installments, add a Shadcn UI `<Select>`.
-   - Populate the options with accounts from the current bank (`useBank(bankId)`).
-   - **Filter options:** Exclude accounts of type `CASH` or `INVESTMENT`. Only include accounts where `account.currency === installment.currency`.
-   - Disable the "Pay" button if no account is selected.
-2. **Update Forms:**
-   - Update `CardFormDialog.tsx` and `LoanForm.tsx` to receive `bankId` instead of `accountId`.
+1. Import required components (`Input`, `Select`, `Switch`, `Label`) from `@/components/ui/...` into `BankDetailContent.tsx`.
+2. Add the filtering state variables.
+3. Implement the `useMemo` block to compute `filteredAccounts`.
+4. Extract unique currencies and types from `bank.accounts` to populate the Select options dynamically, ensuring the dropdowns only show relevant options for that specific bank.
+5. Build the UI toolbar directly above the accounts grid.
+6. Replace `bank.accounts.map` with `filteredAccounts.map`.
+7. Add the "No matches" fallback state.
 
 ## Verification & Testing
-- Verify that Cards and Loans are displayed side-by-side at the bottom of the Bank Details page on desktop, and stacked on mobile.
-- Create a new Card/Loan and ensure it is linked to the Bank.
-- Attempt to pay an installment:
-  - Verify the account dropdown only shows valid accounts (matching currency, not CASH/INVESTMENT).
-  - Verify the "Pay" button is disabled until an account is selected.
-  - Verify the payment successfully debits the chosen account and updates the UI.
+- Load a bank with multiple accounts of different currencies, types, and balances.
+- Type in the search bar and verify only matching names appear.
+- Select 'USD' from the currency filter and verify 'ARS' accounts disappear.
+- Toggle 'Hide empty accounts' and verify accounts with a balance of `0` disappear.
+- Click 'Clear Filters' and verify the original list is restored.
