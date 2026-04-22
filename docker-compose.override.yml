@@ -2,8 +2,8 @@
 # docker-compose.override.yml — Development overrides
 # =============================================================================
 # Docker Compose loads this file automatically alongside docker-compose.yml.
-# Exposes microservice ports to the host so each service's Swagger UI is
-# accessible directly for testing — without going through the gateway.
+# Exposes microservice and infrastructure ports to the host for local development.
+# In production, this file should NOT be used (e.g., using `docker compose -f docker-compose.yml up -d`).
 #
 # Swagger UIs (only available in development):
 #   Users service        → http://localhost:8081/swagger-ui.html
@@ -16,6 +16,29 @@
 # =============================================================================
 
 services:
+  # ─── Infrastructure ───────────────────────────────────────────────────────────
+  postgres:
+    ports:
+      - "5432:5432"
+
+  kafka:
+    ports:
+      - "9093:9093"
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  # ─── Application services ─────────────────────────────────────────────────────
+  gateway:
+    ports:
+      - "8080:8080"
+
+  frontend:
+    ports:
+      - "3000:3000"
+
   service-users:
     ports:
       - "8081:8081"
@@ -35,3 +58,7 @@ services:
   service-upload:
     ports:
       - "8085:8085"
+
+  service-investments:
+    ports:
+      - "8086:8086"

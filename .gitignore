@@ -6,7 +6,7 @@
 package-lock.json
 package.json
 docs/superpowers
-
+/conductor
 # Maven
 target/
 *.class
@@ -53,9 +53,9 @@ back/ms-investments/
 front/financial-app/
 
 # Custom
-
 git-manager.sh
 .dev-pids
+/scripts
 
 CLAUDE.md
 

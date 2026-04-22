@@ -2,6 +2,21 @@ services:
 
   # ─── Infrastructure ───────────────────────────────────────────────────────────
 
+  proxy:
+    profiles: [app]
+    image: nginx:alpine
+    container_name: reverse-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - gateway
+    networks:
+      - internal
+    restart: unless-stopped
+
   postgres:
     image: postgres:17
     container_name: postgres
@@ -9,8 +24,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "5432:5432"   # exposed for local dev debugging
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/init:/docker-entrypoint-initdb.d
@@ -42,8 +55,6 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    ports:
-      - "9093:9093"   # exposed for local dev (services running outside Docker)
     networks:
       - internal
     restart: unless-stopped
@@ -55,9 +66,6 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    ports:
-      - "9000:9000"   # S3 API — exposed for local dev
-      - "9001:9001"   # MinIO Console — exposed for local dev
     volumes:
       - minio_data:/data
     networks:
@@ -69,13 +77,10 @@ services:
 
   gateway:
     profiles: [app]
-    build:
-      context: ./back
-      dockerfile: ms-gateway/Dockerfile
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-gateway:latest
     container_name: gateway
-    ports:
-      - "8080:8080"
     environment:
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
       JWT_SECRET: ${JWT_SECRET}
       JWT_ENABLED: ${JWT_ENABLED:-true}
       USERS_SERVICE_URL: ${USERS_SERVICE_URL}
@@ -85,6 +90,10 @@ services:
       UPLOAD_SERVICE_URL: ${UPLOAD_SERVICE_URL}
       INVESTMENTS_SERVICE_URL: ${INVESTMENTS_SERVICE_URL}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+    deploy:
+      resources:
+        limits:
+          memory: 350M
     depends_on:
       - service-users
       - service-finances
@@ -98,11 +107,10 @@ services:
 
   service-users:
     profiles: [app]
-    build:
-      context: ./back
-      dockerfile: ms-users/Dockerfile
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-users:latest
     container_name: service-users
     environment:
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
@@ -111,6 +119,10 @@ services:
       JWT_EXPIRATION: ${JWT_EXPIRATION}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    deploy:
+      resources:
+        limits:
+          memory: 350M
     depends_on:
       - postgres
       - kafka
@@ -120,15 +132,18 @@ services:
 
   service-finances:
     profiles: [app]
-    build:
-      context: ./back
-      dockerfile: ms-finances/Dockerfile
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-finances:latest
     container_name: service-finances
     environment:
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+    deploy:
+      resources:
+        limits:
+          memory: 350M
     depends_on:
       - postgres
       - kafka
@@ -143,10 +158,15 @@ services:
       dockerfile: ms-banks/Dockerfile
     container_name: service-banks
     environment:
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=banks
       DB_USERNAME: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+    deploy:
+      resources:
+        limits:
+          memory: 350M
     depends_on:
       - postgres
       - kafka
@@ -161,6 +181,7 @@ services:
       dockerfile: ms-notifications/Dockerfile
     container_name: service-notifications
     environment:
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
@@ -170,6 +191,10 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       NOTIFICATION_SCHEDULER_CRON: ${NOTIFICATION_SCHEDULER_CRON}
+    deploy:
+      resources:
+        limits:
+          memory: 350M
     depends_on:
       - postgres
       - kafka
@@ -190,6 +215,7 @@ services:
       dockerfile: ms-upload/Dockerfile
     container_name: service-upload
     environment:
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
@@ -199,6 +225,10 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET_STATEMENTS: ${MINIO_BUCKET_STATEMENTS}
       MINIO_BUCKET_RECEIPTS: ${MINIO_BUCKET_RECEIPTS}
+    deploy:
+      resources:
+        limits:
+          memory: 350M
     depends_on:
       - postgres
       - kafka
@@ -214,12 +244,17 @@ services:
       dockerfile: ms-investments/Dockerfile
     container_name: service-investments
     environment:
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=investments
       DB_USERNAME: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
       IOL_USERNAME: ${IOL_USERNAME}
       IOL_PASSWORD: ${IOL_PASSWORD}
+    deploy:
+      resources:
+        limits:
+          memory: 350M
     depends_on:
       - postgres
       - kafka
@@ -229,13 +264,8 @@ services:
 
   frontend:
     profiles: [app]
-    build:
-      context: ./front/financial-app
-      args:
-        NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL}
+    image: ghcr.io/sergio-smirnoff/financial-app-front-financial-app:latest
     container_name: frontend
-    ports:
-      - "3000:3000"
     environment:
       NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL}
     depends_on:
@@ -247,6 +277,11 @@ services:
 volumes:
   postgres_data:
   minio_data:
+
+networks:
+  internal:
+    driver: bridge
+
 
 networks:
   internal:
