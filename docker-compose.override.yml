@@ -17,6 +17,10 @@
 
 services:
   # ─── Infrastructure ───────────────────────────────────────────────────────────
+  traefik:
+    ports:
+      - "8888:8080" # Traefik dashboard
+
   postgres:
     ports:
       - "5432:5432"

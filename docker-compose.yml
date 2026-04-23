@@ -2,19 +2,43 @@ services:
 
   # ─── Infrastructure ───────────────────────────────────────────────────────────
 
-  proxy:
+  traefik:
     profiles: [app]
-    image: nginx:alpine
-    container_name: reverse-proxy
+    image: traefik:v3.0
+    container_name: traefik
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     ports:
       - "80:80"
+      - "443:443"
     volumes:
-      - ./infra/proxy/nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - frontend
-      - gateway
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "letsencrypt:/letsencrypt"
     networks:
       - internal
+    restart: unless-stopped
+
+  duckdns:
+    profiles: [app]
+    image: lscr.io/linuxserver/duckdns:latest
+    container_name: duckdns
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Argentina/Buenos_Aires
+      - SUBDOMAINS=${DUCKDNS_DOMAIN}
+      - TOKEN=${DUCKDNS_TOKEN}
+      - LOG_FILE=false
     restart: unless-stopped
 
   postgres:
@@ -73,7 +97,6 @@ services:
     restart: unless-stopped
 
   # ─── Application services (profile: app) ─────────────────────────────────────
-  # Start with: docker compose --profile app up
 
   gateway:
     profiles: [app]
@@ -103,6 +126,11 @@ services:
       - service-investments
     networks:
       - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gateway.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.gateway.entrypoints=websecure"
+      - "traefik.http.routers.gateway.tls.certresolver=myresolver"
     restart: unless-stopped
 
   service-users:
@@ -153,9 +181,7 @@ services:
 
   service-banks:
     profiles: [app]
-    build:
-      context: ./back
-      dockerfile: ms-banks/Dockerfile
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-banks:latest
     container_name: service-banks
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
@@ -176,9 +202,7 @@ services:
 
   service-notifications:
     profiles: [app]
-    build:
-      context: ./back
-      dockerfile: ms-notifications/Dockerfile
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-notifications:latest
     container_name: service-notifications
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
@@ -210,9 +234,7 @@ services:
 
   service-upload:
     profiles: [app]
-    build:
-      context: ./back
-      dockerfile: ms-upload/Dockerfile
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-upload:latest
     container_name: service-upload
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
@@ -239,9 +261,7 @@ services:
 
   service-investments:
     profiles: [app]
-    build:
-      context: ./back
-      dockerfile: ms-investments/Dockerfile
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-investments:latest
     container_name: service-investments
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
@@ -272,16 +292,17 @@ services:
       - gateway
     networks:
       - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN_NAME}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
     restart: unless-stopped
 
 volumes:
   postgres_data:
   minio_data:
-
-networks:
-  internal:
-    driver: bridge
-
+  letsencrypt:
 
 networks:
   internal:

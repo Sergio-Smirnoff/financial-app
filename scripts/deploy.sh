@@ -108,34 +108,41 @@ done
 # ---------------------------------------------------------------------------
 # Verify or Generate .env
 # ---------------------------------------------------------------------------
-if [[ ! -f "$DEPLOY_DIR/.env" ]]; then
+ENV_FILE="$DEPLOY_DIR/.env"
+
+if [[ -f "$DEPLOY_DIR/.env.production" && ! -f "$ENV_FILE" ]]; then
+  info "Found .env.production. Copying to .env..."
+  cp "$DEPLOY_DIR/.env.production" "$ENV_FILE"
+elif [[ ! -f "$ENV_FILE" ]]; then
   warn ".env not found! Let's configure it now."
   echo ""
-  read -p "Enter server Public IP (e.g. 201.212.176.73): " PUBLIC_IP
+  read -p "Enter Domain Name (e.g. sergio.duckdns.org): " DOMAIN_NAME
+  read -p "Are you using DuckDNS? (y/n): " IS_DUCK
+  if [[ $IS_DUCK =~ ^[Yy]$ ]]; then
+    read -p "  Enter DuckDNS Token: " DUCK_TOKEN
+    read -p "  Enter DuckDNS Subdomain (just the name, no .duckdns.org): " DUCK_SUB
+  fi
+  read -p "Enter Email for Let's Encrypt SSL: " ACME_EMAIL
   read -p "Enter new Postgres password: " PG_PASS
   read -p "Enter new Minio admin password: " MINIO_PASS
-  echo ""
-  echo "GitHub Container Registry (GHCR) Authentication:"
-  read -p "Enter GitHub Username: " GH_USER
-  read -p "Enter GitHub Personal Access Token (PAT): " GH_PAT
   
   JWT_SECRET=$(openssl rand -hex 64)
 
-  cp "$DEPLOY_DIR/.env.example" "$DEPLOY_DIR/.env"
+  cp "$DEPLOY_DIR/.env.example" "$ENV_FILE"
   
   # Replace values in newly generated .env
-  sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${PG_PASS}/" "$DEPLOY_DIR/.env"
-  sed -i "s/MINIO_ROOT_PASSWORD=.*/MINIO_ROOT_PASSWORD=${MINIO_PASS}/" "$DEPLOY_DIR/.env"
-  sed -i "s/JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" "$DEPLOY_DIR/.env"
-  sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=http://${PUBLIC_IP},http://localhost,http://192.168.0.218|" "$DEPLOY_DIR/.env"
-  sed -i "s|NEXT_PUBLIC_GATEWAY_URL=.*|NEXT_PUBLIC_GATEWAY_URL=http://${PUBLIC_IP}/api|" "$DEPLOY_DIR/.env"
+  sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${PG_PASS}/" "$ENV_FILE"
+  sed -i "s/MINIO_ROOT_PASSWORD=.*/MINIO_ROOT_PASSWORD=${MINIO_PASS}/" "$ENV_FILE"
+  sed -i "s/JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" "$ENV_FILE"
+  sed -i "s/DOMAIN_NAME=.*/DOMAIN_NAME=${DOMAIN_NAME}/" "$ENV_FILE"
+  sed -i "s/ACME_EMAIL=.*/ACME_EMAIL=${ACME_EMAIL}/" "$ENV_FILE"
+  if [[ $IS_DUCK =~ ^[Yy]$ ]]; then
+    sed -i "s/DUCKDNS_TOKEN=.*/DUCKDNS_TOKEN=${DUCK_TOKEN}/" "$ENV_FILE"
+    sed -i "s/DUCKDNS_DOMAIN=.*/DUCKDNS_DOMAIN=${DUCK_SUB}/" "$ENV_FILE"
+  fi
+  sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://${DOMAIN_NAME},http://localhost,http://192.168.0.218|" "$ENV_FILE"
+  sed -i "s|NEXT_PUBLIC_GATEWAY_URL=.*|NEXT_PUBLIC_GATEWAY_URL=https://${DOMAIN_NAME}/api|" "$ENV_FILE"
   
-  # Save GHCR credentials to .env to make subsequent logins easier
-  echo "" >> "$DEPLOY_DIR/.env"
-  echo "# GHCR Credentials" >> "$DEPLOY_DIR/.env"
-  echo "GH_USER=${GH_USER}" >> "$DEPLOY_DIR/.env"
-  echo "GH_PAT=${GH_PAT}" >> "$DEPLOY_DIR/.env"
-
   success ".env generated successfully."
 else
   info ".env found."
@@ -145,12 +152,33 @@ fi
 # Authenticate with GHCR
 # ---------------------------------------------------------------------------
 info "Authenticating with GitHub Container Registry (GHCR)..."
-source "$DEPLOY_DIR/.env"
-if [[ -n "${GH_USER:-}" && -n "${GH_PAT:-}" ]]; then
-  echo "$GH_PAT" | docker login ghcr.io -u "$GH_USER" --password-stdin
-  success "Logged into GHCR."
+
+# Extract credentials using grep/cut to avoid issues with unquoted spaces in .env
+GH_USER_FROM_ENV=$(grep "^GH_USER=" "$ENV_FILE" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+GH_PAT_FROM_ENV=$(grep "^GH_PAT=" "$ENV_FILE" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+
+if [[ -n "${GH_USER_FROM_ENV:-}" && -n "${GH_PAT_FROM_ENV:-}" ]]; then
+  echo "$GH_PAT_FROM_ENV" | docker login ghcr.io -u "$GH_USER_FROM_ENV" --password-stdin
+  success "Logged into GHCR using credentials from .env."
 else
-  warn "GH_USER or GH_PAT not found in .env. Skipping GHCR login. Pulls may fail."
+  warn "GHCR credentials not found in .env."
+  echo "GitHub Container Registry Authentication required to pull images:"
+  read -p "Enter GitHub Username: " GH_USER_PROMPT
+  read -p "Enter GitHub Personal Access Token (PAT): " GH_PAT_PROMPT
+  
+  echo "$GH_PAT_PROMPT" | docker login ghcr.io -u "$GH_USER_PROMPT" --password-stdin
+  success "Logged into GHCR."
+  
+  # Ask if user wants to save them for next time
+  read -p "Do you want to save these credentials in .env for future deployments? (y/n) " -n 1 -r
+  echo ""
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "" >> "$ENV_FILE"
+    echo "# GHCR Credentials" >> "$ENV_FILE"
+    echo "GH_USER=${GH_USER_PROMPT}" >> "$ENV_FILE"
+    echo "GH_PAT=${GH_PAT_PROMPT}" >> "$ENV_FILE"
+    success "Credentials saved to .env."
+  fi
 fi
 
 # ---------------------------------------------------------------------------

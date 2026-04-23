@@ -25,10 +25,14 @@ The application uses GitHub Actions to build Docker images and push them to GHCR
 2. Generate a new token (Classic) with the `read:packages` scope.
 3. Save this token. The deployment script will ask for it during the first run to authenticate the server.
 
-### Network Configuration (No UFW)
+### Network Configuration & SSL (Traefik)
 Because the server runs CasaOS (which manages its own Docker networks and other apps like Ollama/n8n), **we do not use UFW**. Instead, security is handled entirely by Docker:
 *   The `docker-compose.yml` does **NOT** expose ports for internal services (Postgres, Minio, Kafka, Gateway, Frontend) to the host.
-*   Only the `proxy` service (Nginx) exposes port `80` to the internet. 
+*   Only the `traefik` service exposes ports `80` and `443` to the internet. 
+
+**Domain and SSL:** The system uses Traefik as an intelligent reverse proxy. It will automatically generate and renew SSL certificates using Let's Encrypt for your domain. 
+*   **Requirement**: You must have a domain name (e.g. via DuckDNS or Cloudflare) pointing to your server's Public IP.
+*   Port 80 and 443 must be forwarded in your router to your CasaOS server.
 
 ## 3. Deploying / Updating
 
@@ -44,11 +48,11 @@ To deploy the application for the first time, or to pull the latest changes from
     # To update existing code to the latest master branch:
     ./scripts/deploy.sh --update
     ```
-4.  **First time only**: The script will interactively ask for your Public IP, new passwords, and your GitHub Username and PAT to automatically generate a secure `.env` file and log you into GHCR.
+4.  **First time only**: The script will interactively ask for your Domain Name, Let's Encrypt email, new passwords, and your GitHub Username and PAT to automatically generate a secure `.env` file and log you into GHCR.
 5.  After the script finishes, pull the latest images and start the containers:
     ```bash
-    # Start Infra & Proxy
-    docker compose -f docker-compose.yml up -d postgres zookeeper kafka minio proxy
+    # Start Infra & Traefik
+    docker compose -f docker-compose.yml up -d postgres zookeeper kafka minio traefik
 
     # Download updated images from GHCR
     docker compose -f docker-compose.yml --profile app pull
@@ -85,8 +89,8 @@ If services fail to start or connect, check these common issues:
 *   **Cause**: Zookeeper hasn't fully started, or the JVM ran out of memory.
 *   **Fix**: Kafka requires a lot of RAM. Check if the container was OOMKilled (`docker compose ps`). Try restarting it individually: `docker compose restart kafka`.
 
-### C. Nginx "502 Bad Gateway"
-*   **Cause**: The `proxy` is running, but either `gateway:8080` or `frontend:3000` is down or still booting.
+### C. Traefik "502 Bad Gateway"
+*   **Cause**: Traefik is running, but either `gateway:8080` or `frontend:3000` is down or still booting.
 *   **Fix**: 
     1. Java microservices take ~30-60 seconds to boot on limited RAM (`-Xmx256m`). Wait a minute and refresh.
     2. Check gateway logs: `docker compose --profile app logs gateway`.
@@ -94,13 +98,10 @@ If services fail to start or connect, check these common issues:
 ### D. Frontend CORS Errors or "Network Error" on Login
 *   **Cause**: The `NEXT_PUBLIC_GATEWAY_URL` or `ALLOWED_ORIGINS` in `.env` are misconfigured.
 *   **Fix**: 
-    1. Ensure `NEXT_PUBLIC_GATEWAY_URL=http://<YOUR_PUBLIC_IP>/api`
-    2. Ensure `ALLOWED_ORIGINS` includes `http://<YOUR_PUBLIC_IP>` and `http://localhost`.
-    3. **Crucial**: If you changed `.env`, you MUST rebuild the frontend image because Next.js bakes `NEXT_PUBLIC_*` variables into the static HTML at build time:
-       ```bash
-       docker compose --profile app build frontend
-       docker compose --profile app up -d frontend
-       ```
+    1. Ensure `NEXT_PUBLIC_GATEWAY_URL=https://<YOUR_DOMAIN>/api`
+    2. Ensure `ALLOWED_ORIGINS` includes `https://<YOUR_DOMAIN>` and `http://localhost`.
+    3. **Crucial**: If you changed `.env`, you MUST rebuild the frontend image or ensure GH Actions is triggered to bake the correct `NEXT_PUBLIC_` variable. (Note: in production, images are pre-baked; you may need to use environment injection at runtime or re-build the specific image via GH Actions).
+
 
 ### E. High Memory Usage / Host Freezing
 *   **Cause**: Java limits are not being applied.
