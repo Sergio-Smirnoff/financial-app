@@ -59,6 +59,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 info()  { echo -e "${GREEN}[deploy]${NC} $*"; }
+success() { echo -e "${GREEN}[success]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[warn]${NC}  $*"; }
 error() { echo -e "${RED}[error]${NC} $*" >&2; }
 
