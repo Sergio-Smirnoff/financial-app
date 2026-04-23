@@ -153,15 +153,37 @@ fi
 # ---------------------------------------------------------------------------
 info "Authenticating with GitHub Container Registry (GHCR)..."
 
-# Extract credentials using grep/cut to avoid issues with unquoted spaces in .env
-GH_USER_FROM_ENV=$(grep "^GH_USER=" "$ENV_FILE" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
-GH_PAT_FROM_ENV=$(grep "^GH_PAT=" "$ENV_FILE" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+# Extract credentials safely (grep returns 1 if not found, which triggers set -e)
+GH_USER_FROM_ENV=$(grep "^GH_USER=" "$ENV_FILE" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
+GH_PAT_FROM_ENV=$(grep "^GH_PAT=" "$ENV_FILE" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
+
+# Check for other missing production variables
+MISSING_VARS=false
+if ! grep -q "^DOMAIN_NAME=" "$ENV_FILE"; then MISSING_VARS=true; fi
+if ! grep -q "^ACME_EMAIL=" "$ENV_FILE"; then MISSING_VARS=true; fi
+
+if $MISSING_VARS; then
+  warn "Some production variables (Domain, SSL) are missing from your .env."
+  read -p "Would you like to configure them now? (y/n): " UPDATE_ENV
+  if [[ $UPDATE_ENV =~ ^[Yy]$ ]]; then
+    read -p "  Enter Domain Name (e.g. sergio.duckdns.org): " DOMAIN_NAME
+    read -p "  Enter Email for Let's Encrypt SSL: " ACME_EMAIL
+    echo "" >> "$ENV_FILE"
+    echo "# Traefik / SSL" >> "$ENV_FILE"
+    echo "DOMAIN_NAME=${DOMAIN_NAME}" >> "$ENV_FILE"
+    echo "ACME_EMAIL=${ACME_EMAIL}" >> "$ENV_FILE"
+    # Update URLs to match new domain
+    sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://${DOMAIN_NAME},http://localhost,http://192.168.0.218|" "$ENV_FILE"
+    sed -i "s|NEXT_PUBLIC_GATEWAY_URL=.*|NEXT_PUBLIC_GATEWAY_URL=https://${DOMAIN_NAME}/api|" "$ENV_FILE"
+    success "Environment updated."
+  fi
+fi
 
 if [[ -n "${GH_USER_FROM_ENV:-}" && -n "${GH_PAT_FROM_ENV:-}" ]]; then
   echo "$GH_PAT_FROM_ENV" | docker login ghcr.io -u "$GH_USER_FROM_ENV" --password-stdin
   success "Logged into GHCR using credentials from .env."
 else
-  warn "GHCR credentials not found in .env."
+  warn "GHCR credentials not found or incomplete in .env."
   echo "GitHub Container Registry Authentication required to pull images:"
   read -p "Enter GitHub Username: " GH_USER_PROMPT
   read -p "Enter GitHub Personal Access Token (PAT): " GH_PAT_PROMPT
