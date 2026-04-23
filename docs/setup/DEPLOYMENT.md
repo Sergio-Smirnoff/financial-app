@@ -51,8 +51,8 @@ To deploy the application for the first time, or to pull the latest changes from
 4.  **First time only**: The script will interactively ask for your Domain Name, Let's Encrypt email, new passwords, and your GitHub Username and PAT to automatically generate a secure `.env` file and log you into GHCR.
 5.  After the script finishes, pull the latest images and start the containers:
     ```bash
-    # Start Infra & Traefik
-    docker compose -f docker-compose.yml up -d postgres zookeeper kafka minio traefik
+    # Start Infra, Traefik & DuckDNS
+    docker compose -f docker-compose.yml up -d postgres zookeeper kafka minio traefik duckdns
 
     # Download updated images from GHCR
     docker compose -f docker-compose.yml --profile app pull

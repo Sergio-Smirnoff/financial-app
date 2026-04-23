@@ -210,7 +210,7 @@ fi
 echo ""
 info "All repos ready. Next steps for Production Deployment:"
 echo ""
-echo "  1. Start infra:   docker compose -f docker-compose.yml up -d postgres zookeeper kafka minio proxy"
+echo "  1. Start infra:   docker compose -f docker-compose.yml up -d postgres zookeeper kafka minio traefik duckdns"
 echo "  2. Pull images:   docker compose -f docker-compose.yml --profile app pull"
 echo "  3. Start app:     docker compose -f docker-compose.yml --profile app up -d"
 echo "  4. Check status:  docker compose ps"
