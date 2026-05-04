@@ -76,7 +76,7 @@ APP_SERVICES="gateway service-users service-finances service-banks service-notif
 LOGS_DIR="$SCRIPT_DIR/logs"
 PIDS_FILE="$SCRIPT_DIR/.dev-pids"
 # Non-skeleton services started by default (gateway always last)
-DEFAULT_LOCAL_SERVICES="service-users service-notifications service-finances service-investments service-banks gateway"
+DEFAULT_LOCAL_SERVICES="service-users service-notifications service-finances service-investments service-banks service-upload gateway"
 
 # =============================================================================
 # Commands

@@ -1,0 +1,53 @@
+services:
+  service-upload:
+    image: financial-app-service-upload:latest
+    container_name: service-upload-dev
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/financialapp
+      - SPRING_DATASOURCE_USERNAME=financialapp
+      - SPRING_DATASOURCE_PASSWORD=changeme
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=changeme
+      - MINIO_BUCKET_STATEMENTS=statements
+      - MINIO_BUCKET_RECEIPTS=receipts
+    networks:
+      - financial-app_internal
+
+  service-finances:
+    image: financial-app-service-finances:latest
+    container_name: service-finances-dev
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/financialapp
+      - SPRING_DATASOURCE_USERNAME=financialapp
+      - SPRING_DATASOURCE_PASSWORD=changeme
+    networks:
+      - financial-app_internal
+
+  service-users:
+    image: financial-app-service-users:latest
+    container_name: service-users-dev
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/financialapp
+      - SPRING_DATASOURCE_USERNAME=financialapp
+      - SPRING_DATASOURCE_PASSWORD=changeme
+      - JWT_SECRET=change_this_to_a_very_long_random_secret_at_least_512_bits
+    networks:
+      - financial-app_internal
+
+  gateway:
+    image: financial-app-gateway:latest
+    container_name: gateway-dev
+    ports:
+      - "8080:8080"
+    environment:
+      - UPLOAD_SERVICE_URL=http://service-upload-dev:8085
+      - FINANCES_SERVICE_URL=http://service-finances-dev:8082
+      - USERS_SERVICE_URL=http://service-users-dev:8081
+      - JWT_SECRET=change_this_to_a_very_long_random_secret_at_least_512_bits
+    networks:
+      - financial-app_internal
+
+networks:
+  financial-app_internal:
+    external: true
