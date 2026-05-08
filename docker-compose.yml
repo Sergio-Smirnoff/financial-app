@@ -239,7 +239,7 @@ services:
     image: ghcr.io/sergio-smirnoff/financial-app-back-ms-upload:latest
     container_name: service-upload
     environment:
-      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
+      JAVA_TOOL_OPTIONS: "-Xmx384m -Xms128m"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
