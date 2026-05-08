@@ -38,11 +38,11 @@ El patrón `openConfirmDelete` + `mutation.mutate` + `toast` se repite en 9 mód
 
 ## 3. Propuestas de Mejora y Consistencia
 
-### A. Estandarización de Formularios
-Existe una inconsistencia técnica en la creación de formularios:
-- **Manual**: `BankFormDialog` usa `useState` por cada campo y gestión de eventos manual.
-- **Moderno**: `HoldingForm` y `LoanForm` usan `react-hook-form` con `zod`.
-- **Acción**: Migrar `BankFormDialog` y `AccountFormDialog` a `react-hook-form` para ganar validación robusta y consistencia.
+### A. Estandarización de Formularios (COMPLETADO)
+Existe una consistencia técnica total en la creación de formularios:
+- **Moderno**: Toda la aplicación usa ahora `react-hook-form` con `zod` y esquemas centralizados en `lib/schemas`.
+- **Acción**: Migración finalizada de `BankFormDialog`, `AccountFormDialog`, `CardFormDialog` y `CardExpenseDialog`. 
+
 
 ### B. Centralización de Skeletons
 Actualmente, los estados de carga "skeleton" están hardcodeados con divs `animate-pulse` dentro de los componentes (ej. `HoldingForm`).
@@ -90,7 +90,7 @@ Se han detectado múltiples instancias de colores fijos que no cambian al altern
 | **Corrección Modo Claro/Oscuro** | Crítico (Usabilidad) | Medio |
 | **Componente AppCard** | Alto (Consistencia Visual) | Bajo |
 | **Hook useDeleteAction** | Medio (Menos Código) | Bajo |
-| **Estandarizar Formularios** | Alto (Mantenibilidad) | Medio |
+| **Estandarizar Formularios** | Alto (Mantenibilidad) | COMPLETADO |
 | **QueryBoundary** | Medio (Legibilidad) | Bajo |
 
 ---
