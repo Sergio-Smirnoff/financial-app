@@ -128,6 +128,7 @@ elif [[ ! -f "$ENV_FILE" ]]; then
   read -p "Enter new Minio admin password: " MINIO_PASS
   
   JWT_SECRET=$(openssl rand -hex 64)
+  INTERNAL_AUTH_TOKEN=$(openssl rand -hex 32)
 
   cp "$DEPLOY_DIR/.env.example" "$ENV_FILE"
   
@@ -135,6 +136,7 @@ elif [[ ! -f "$ENV_FILE" ]]; then
   sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${PG_PASS}/" "$ENV_FILE"
   sed -i "s/MINIO_ROOT_PASSWORD=.*/MINIO_ROOT_PASSWORD=${MINIO_PASS}/" "$ENV_FILE"
   sed -i "s/JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" "$ENV_FILE"
+  sed -i "s/INTERNAL_AUTH_TOKEN=.*/INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN}/" "$ENV_FILE"
   sed -i "s/DOMAIN_NAME=.*/DOMAIN_NAME=${DOMAIN_NAME}/" "$ENV_FILE"
   sed -i "s/ACME_EMAIL=.*/ACME_EMAIL=${ACME_EMAIL}/" "$ENV_FILE"
   if [[ $IS_DUCK =~ ^[Yy]$ ]]; then
@@ -162,18 +164,27 @@ GH_PAT_FROM_ENV=$(grep "^GH_PAT=" "$ENV_FILE" | cut -d'=' -f2- | tr -d '"' | tr 
 MISSING_VARS=false
 if ! grep -q "^DOMAIN_NAME=" "$ENV_FILE"; then MISSING_VARS=true; fi
 if ! grep -q "^ACME_EMAIL=" "$ENV_FILE"; then MISSING_VARS=true; fi
+if ! grep -q "^INTERNAL_AUTH_TOKEN=" "$ENV_FILE"; then MISSING_VARS=true; fi
 
 if $MISSING_VARS; then
-  warn "Some production variables (Domain, SSL) are missing from your .env."
+  warn "Some production variables (Domain, SSL, S2S Token) are missing from your .env."
   read -p "Would you like to configure them now? (y/n): " UPDATE_ENV
   if [[ $UPDATE_ENV =~ ^[Yy]$ ]]; then
-    read -p "  Enter Domain Name (e.g. sergio.duckdns.org): " DOMAIN_NAME
-    read -p "  Enter Email for Let's Encrypt SSL: " ACME_EMAIL
-    echo "" >> "$ENV_FILE"
-    echo "# Traefik / SSL" >> "$ENV_FILE"
-    echo "DOMAIN_NAME=${DOMAIN_NAME}" >> "$ENV_FILE"
-    echo "ACME_EMAIL=${ACME_EMAIL}" >> "$ENV_FILE"
+    if ! grep -q "^DOMAIN_NAME=" "$ENV_FILE"; then
+        read -p "  Enter Domain Name (e.g. sergio.duckdns.org): " DOMAIN_NAME
+        echo "DOMAIN_NAME=${DOMAIN_NAME}" >> "$ENV_FILE"
+    fi
+    if ! grep -q "^ACME_EMAIL=" "$ENV_FILE"; then
+        read -p "  Enter Email for Let's Encrypt SSL: " ACME_EMAIL
+        echo "ACME_EMAIL=${ACME_EMAIL}" >> "$ENV_FILE"
+    fi
+    if ! grep -q "^INTERNAL_AUTH_TOKEN=" "$ENV_FILE"; then
+        INTERNAL_AUTH_TOKEN=$(openssl rand -hex 32)
+        echo "INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN}" >> "$ENV_FILE"
+        info "Generated new INTERNAL_AUTH_TOKEN."
+    fi
     # Update URLs to match new domain
+    DOMAIN_NAME=$(grep "^DOMAIN_NAME=" "$ENV_FILE" | cut -d'=' -f2-)
     sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://${DOMAIN_NAME},http://localhost,http://192.168.0.218|" "$ENV_FILE"
     sed -i "s|NEXT_PUBLIC_GATEWAY_URL=.*|NEXT_PUBLIC_GATEWAY_URL=https://${DOMAIN_NAME}/api|" "$ENV_FILE"
     success "Environment updated."
@@ -211,9 +222,10 @@ echo ""
 info "All repos ready. Next steps for Production Deployment:"
 echo ""
 echo "  1. Start infra:   docker compose -f docker-compose.yml up -d postgres zookeeper kafka minio traefik duckdns"
-echo "  2. Pull images:   docker compose -f docker-compose.yml --profile app pull"
-echo "  3. Start app:     docker compose -f docker-compose.yml --profile app up -d"
-echo "  4. Check status:  docker compose ps"
+echo "  2. Start monitor: docker compose -f docker-compose.monitoring.yml up -d"
+echo "  3. Pull images:   docker compose -f docker-compose.yml --profile app pull"
+echo "  4. Start app:     docker compose -f docker-compose.yml --profile app up -d"
+echo "  5. Check status:  docker compose ps"
 echo ""
 echo "  (Note: In production, do NOT use docker-compose.override.yml or 'dev.sh up')"
 echo ""
