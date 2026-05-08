@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'financial-app'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - 'gateway:8080'
+          - 'service-users:8081'
+          - 'service-finances:8082'
+          - 'service-banks:8083'
+          - 'service-notifications:8084'
+          - 'service-upload:8085'
+          - 'service-investments:8086'
