@@ -69,6 +69,9 @@ check_env() {
 # ─── Infrastructure services ──────────────────────────────────────────────────
 INFRA_SERVICES="postgres zookeeper kafka minio"
 
+# ─── Monitoring services ──────────────────────────────────────────────────────
+MONITOR_SERVICES="prometheus grafana loki promtail"
+
 # ─── App services ─────────────────────────────────────────────────────────────
 APP_SERVICES="gateway service-users service-finances service-banks service-notifications service-upload service-investments frontend"
 
@@ -93,6 +96,18 @@ cmd_infra() {
     echo "  kafka     → localhost:9092 (internal)"
     echo "  minio     → localhost:9000 (S3 API)"
     echo "  minio UI  → localhost:9001"
+}
+
+cmd_monitor() {
+    header "Starting monitoring stack"
+    check_docker
+    check_env
+    docker compose -f docker-compose.monitoring.yml up -d
+    echo ""
+    success "Monitoring stack running:"
+    echo "  prometheus → http://localhost:9090"
+    echo "  grafana    → http://localhost:3001"
+    echo "  loki       → http://localhost:3100"
 }
 
 cmd_local() {
@@ -225,11 +240,15 @@ cmd_up() {
     info "Starting application services..."
     docker compose --profile app up -d
 
+    info "Starting monitoring stack..."
+    docker compose -f docker-compose.monitoring.yml up -d
+
     echo ""
     success "All services running:"
     echo "  Gateway (API)  → http://localhost:8080"
     echo "  Frontend       → http://localhost:3000"
     echo "  MinIO UI       → http://localhost:9001"
+    echo "  Grafana        → http://localhost:3001"
     echo ""
     echo "  Swagger UIs (dev only):"
     echo "    Users         → http://localhost:8081/swagger-ui.html"
@@ -259,11 +278,15 @@ cmd_prod() {
     info "Starting application services..."
     docker compose -f docker-compose.yml --profile app up -d
 
+    info "Starting monitoring stack..."
+    docker compose -f docker-compose.monitoring.yml up -d
+
     echo ""
     success "All services running (microservice ports NOT exposed):"
     echo "  Gateway (API)  → http://localhost:8080"
     echo "  Frontend       → http://localhost:3000"
     echo "  MinIO UI       → http://localhost:9001"
+    echo "  Grafana        → http://localhost:3001"
     echo ""
     info "Run './scripts/dev.sh logs' to follow all logs."
 }
@@ -272,6 +295,7 @@ cmd_down() {
     header "Stopping all services"
     check_docker
     docker compose --profile app down
+    docker compose -f docker-compose.monitoring.yml down
     success "All containers stopped."
 }
 
@@ -319,6 +343,9 @@ cmd_status() {
     check_docker
     header "Container status"
     docker compose --profile app ps
+    echo ""
+    header "Monitoring status"
+    docker compose -f docker-compose.monitoring.yml ps
 }
 
 # =============================================================================
@@ -670,6 +697,7 @@ cmd_help() {
     echo ""
     echo -e "  ${BOLD}── Docker ────────────────────────────────────────────────────────────${RESET}"
     echo -e "  ${CYAN}./scripts/dev.sh infra${RESET}                                Start infrastructure only"
+    echo -e "  ${CYAN}./scripts/dev.sh monitor${RESET}                              Start monitoring stack only"
     echo -e "  ${CYAN}./scripts/dev.sh dev service-finances${RESET}                 Infra + build + run one service in Docker"
     echo -e "  ${CYAN}./scripts/dev.sh up${RESET}                                   Build + start ALL services (ports exposed)"
     echo -e "  ${CYAN}./scripts/dev.sh prod${RESET}                                 Build + start ALL services (ports hidden)"
@@ -704,6 +732,7 @@ shift || true
 
 case "$COMMAND" in
     infra)              cmd_infra ;;
+    monitor)            cmd_monitor ;;
     local)              cmd_local "${1:-}" ;;
     local-all)          cmd_local_all "$@" ;;
     stop-all)           cmd_stop_all ;;
