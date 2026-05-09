@@ -15,7 +15,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 512M
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   grafana:
     image: grafana/grafana:latest
@@ -33,7 +35,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 512M
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   loki:
     image: grafana/loki:latest
@@ -46,7 +50,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 256M
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   promtail:
     image: grafana/promtail:latest

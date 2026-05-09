@@ -240,9 +240,6 @@ cmd_up() {
     info "Starting application services..."
     docker compose --profile app up -d
 
-    info "Starting monitoring stack..."
-    docker compose -f docker-compose.monitoring.yml up -d
-
     echo ""
     success "All services running:"
     echo "  Gateway (API)  → http://localhost:8080"
@@ -277,9 +274,6 @@ cmd_prod() {
 
     info "Starting application services..."
     docker compose -f docker-compose.yml --profile app up -d
-
-    info "Starting monitoring stack..."
-    docker compose -f docker-compose.monitoring.yml up -d
 
     echo ""
     success "All services running (microservice ports NOT exposed):"
@@ -553,7 +547,7 @@ _start_bg() {
         export INVESTMENTS_SERVICE_URL="http://localhost:8086"
 
         cd "$SCRIPT_DIR/back/$module"
-        exec mvn spring-boot:run
+        exec nohup mvn spring-boot:run
     ) >> "$logfile" 2>&1 &
 
     local pid=$!
@@ -567,7 +561,7 @@ _start_front_bg() {
 
     (
         cd "$SCRIPT_DIR/front/financial-app"
-        exec npm run dev
+        exec nohup npm run dev
     ) >> "$logfile" 2>&1 &
 
     local pid=$!
