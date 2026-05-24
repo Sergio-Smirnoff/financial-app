@@ -119,6 +119,8 @@ Persistence adapters CAN throw `ResourceNotFoundException` directly because they
 5. **Persistence adapters implementing domain repository ports** CAN throw `ResourceNotFoundException` directly — they are implementing the domain contract.
 6. **Use cases do NOT catch `DomainException` unless they intend to re-throw** (as in Flow B, where they catch `InfrastructureException` specifically and re-raise after the `DomainException` re-throw guard).
 
+> **Warning:** If `InfrastructureException` escapes to the handler unwrapped (DDD Rule violation), it will return `500 internal_error` instead of the expected `500 foo_service_unavailable`. Monitor for `internal_error` codes in production as a signal that an adapter exception mapping is missing.
+
 ---
 
 ## File Structure
@@ -208,11 +210,9 @@ public enum DomainError {
     // Request validation
     INVALID_DATE_RANGE(HttpStatus.BAD_REQUEST, "invalid_date_range"),
 
-    // External services
+    // Infrastructure
     FINANCES_SERVICE_UNAVAILABLE(HttpStatus.INTERNAL_SERVER_ERROR, "finances_service_unavailable"),
     INVESTMENTS_SERVICE_UNAVAILABLE(HttpStatus.INTERNAL_SERVER_ERROR, "investments_service_unavailable"),
-
-    // Catch-all
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "internal_error");
 
     private final HttpStatus httpStatus;
@@ -291,7 +291,10 @@ public class FinancesClientAdapter implements FinancesPort {
             var response = client.getTransactions(accountCbu, limit, from, to);
             if (response == null || response.getData() == null) return List.of();
             return response.getData().stream()
-                    .map(d -> new TransactionSummary(...))
+                    .map(d -> new TransactionSummary(   // map all DTO fields explicitly
+                            d.transactionId(), d.accountCbu(),
+                            new Money(d.amount(), Currency.getInstance(d.currency())),
+                            d.description(), d.category(), d.subcategory(), d.date()))
                     .toList();
         } catch (Exception e) {
             log.error("ms-finances call failed [fetchTransactions] for accountCbu={}: {}",
@@ -525,6 +528,11 @@ Did an infrastructure/Feign call fail?
 Did @Valid fail on a request body?
   → No action needed — GlobalExceptionHandler catches MethodArgumentNotValidException automatically
      Returns: { status: 400, code: "validation_error", details: { fields: [...] } }
+
+Did a DB unique constraint fire (DataIntegrityViolationException)?
+  → No action needed — GlobalExceptionHandler.handleDataIntegrity catches it automatically
+  → Returns 409 database_conflict with the constraint name in details
+  → To return a friendlier message, add the constraint name to CONSTRAINT_MESSAGES in GlobalExceptionHandler
 
 Is it an unexpected runtime failure with no domain meaning?
   → Do not throw — let it bubble to GlobalExceptionHandler.handleGeneric
