@@ -173,4 +173,4 @@ Startup sequence: infra (Docker) → non-gateway services in parallel → `/actu
 
 ## Architecture
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for full architecture details.
+See [specs/architecture.md](specs/architecture.md) for full architecture details, and [specs/00-master.md](specs/00-master.md) for the documentation hub.
