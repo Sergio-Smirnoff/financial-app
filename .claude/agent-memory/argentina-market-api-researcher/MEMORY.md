@@ -1,6 +1,0 @@
-- [IOL API](api_iol.md) — API mas completa: acciones, bonos, CEDEARs, historicos. OAuth2, cuenta gratis.
-- [BYMA Data API](api_byma_data.md) — Fuente oficial BYMA, tier gratuito limitado, documentacion escasa.
-- [BCRA API](api_bcra.md) — Variables macro, tipo de cambio, tasas. NO cubre bonos ni acciones.
-- [Yahoo Finance .BA](api_yahoo_finance_ba.md) — Acciones argentinas sin auth, buenos historicos. NO cubre bonos.
-- [Gaps de cobertura](api_coverage_gaps.md) — APIs internacionales no cubren bonos. Solo IOL/BYMA sirven para renta fija.
-- [Estrategia recomendada](strategy_recommended.md) — IOL primario + BYMA secundario + BCRA complemento + Yahoo fallback.
