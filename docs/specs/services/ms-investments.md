@@ -316,7 +316,7 @@ sequenceDiagram
 |---|---|---|
 | `GET` | `/api/v1/investments/market/discovery?limit=` | Trending assets not already in the user's portfolio (default limit 5) |
 
-All endpoints return `ApiResponse<T>` (`success`, `message`, `data`, `errors`, `timestamp`). Numeric response fields are serialised as `String` to avoid JSON precision loss.
+All endpoints return the shared envelope `{ status, title, code, message, data }` from `commons-core` — `code` only on errors, carrying the service `DomainError` slug. Numeric response fields are serialised as `String` to avoid JSON precision loss.
 
 ---
 

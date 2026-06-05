@@ -74,7 +74,7 @@ All paths are relative to the base `POST /api/v1/upload`. `X-User-Id` is always 
 | `POST` | `/csv/confirm` | JSON `CsvConfirmRequest` — `tempKey`, `accountId`, `dateCol`, `descCol`, `debitCol`, `creditCol`, `dateFormat`, `mappings[]` | `CsvImportResponse` — `importId`, `status`, `importedCount` |
 | `GET` | `/history` | — | `StatementImport[]` for the authenticated user, newest first |
 
-All responses are wrapped in the platform envelope: `ApiResponse<T>` (`success`, `message`, `data`, `errors`, `timestamp`).
+All responses are wrapped in the shared envelope `{ status, title, code, message, data }` from `commons-core` — `code` only on errors, carrying the service `DomainError` slug.
 
 ---
 

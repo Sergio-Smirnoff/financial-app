@@ -452,7 +452,7 @@ back/ms-finances/src/main/java/com/financialapp/finances/
 - `@Transactional` lives in application use-case impls, never in controllers.
 - The domain layer has zero framework imports (enforced by `LayeredArchitectureTest` with ArchUnit).
 - `MigrationSeamTest` tracks old→new migration progress.
-- All endpoints return `ApiResponse<T>` (success, message, data, errors, timestamp).
+- All endpoints return the shared envelope `{ status, title, code, message, data }` from `commons-core` — `code` only on errors, carrying the service `DomainError` slug.
 - Exceptions: `DomainExceptionHandler` (`@RestControllerAdvice`) maps `DomainException` subtypes
   to structured HTTP error responses.
 

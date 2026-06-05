@@ -21,59 +21,107 @@ Domain-Driven Design is mandatory on every slice, not optional.
 
 ---
 
-## 2. ApiResponse\<T\> Envelope
+## 2. SOLID & OOP Principles
 
-Every endpoint in every service returns this shape.
+Mandatory on every class, in every layer, in every service. DDD (§1) governs WHAT the
+model expresses; SOLID governs HOW every class is shaped. A change that satisfies §1 but
+violates a principle below is still rejected.
 
-### 2.1 Fields
-
-| Field | Type | Notes |
+| Principle | Rule in this project | Violation example |
 | :-- | :-- | :-- |
-| `success` | `boolean` | `true` for 2xx responses. The consumer's success signal. |
-| `message` | `String` | Human-readable note (`"OK"`, `"Account created"`). Always present. |
-| `data` | `T` (any) | The payload. Omitted when null (`@JsonInclude(NON_NULL)`). |
-| `errors` | `List<String>` | Omitted on success. Present on error with one entry per validation failure. |
-| `timestamp` | `Instant` (ISO-8601) | Server time the response was built. Always present. |
+| **S** — Single Responsibility | A class has exactly one reason to change. Controllers translate HTTP only; use cases orchestrate exactly one business operation; VOs enforce their own invariants; adapters touch exactly one external system. | A controller that maps DTOs, validates business rules, and calls repositories. |
+| **O** — Open/Closed | Extend behavior by adding new classes/enum constants, never by editing stable ones. Service exception handlers extend the shared base and add handlers; new error kinds are new `DomainError` constants — the category→HTTP mapper never changes per code. | Adding an `if (type == X)` branch to an existing class every time a new case appears. |
+| **L** — Liskov Substitution | Every subtype is usable wherever its base type is expected, with no surprises. Any `DomainException` subclass flows through the same handler; any port implementation honors the port's full contract. | A repository implementation that throws `UnsupportedOperationException` on one inherited method. |
+| **I** — Interface Segregation | Ports expose only what their consumer needs (`SupportedCurrencies` has exactly `isSupported` + `all`). Split interfaces per consumer rather than growing one fat one. | A single `AccountPort` with 15 methods where each adapter implements 3 and stubs 12. |
+| **D** — Dependency Inversion | High-level policy depends on abstractions, never on concretions. The domain defines ports; infrastructure implements them. Shared code depends on interfaces (`ErrorCode`), never on concrete service enums. Domain has zero framework imports (ArchUnit-enforced where present). | A use case importing a JPA repository or a Feign client directly. |
 
-### 2.2 Success example
-
-```json
-{
-  "success": true,
-  "message": "OK",
-  "data": { "id": 1, "name": "Savings" },
-  "timestamp": "2026-06-02T03:00:00Z"
-}
-```
-
-### 2.3 Error example
-
-```json
-{
-  "success": false,
-  "message": "Validation failed",
-  "errors": ["amount must be positive", "currency is required"],
-  "timestamp": "2026-06-02T03:00:00Z"
-}
-```
-
-### 2.4 Controller usage
-
-- `200` — `ResponseEntity.ok(ApiResponse.ok(data))`
-- `201` — `ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("Created", data))` — the body shape is identical; only the HTTP status differs.
-- Errors — returned by `GlobalExceptionHandler` via `ApiResponse.error(message)` or `ApiResponse.error(message, errors)`.
-
-> **No second envelope class.** Services that have a separate `ErrorResponse` class must migrate their `GlobalExceptionHandler` to return `ApiResponse.error(...)` and drop `ErrorResponse`. The `ApiResponse` class is the single wire shape for both success and error.
+OOP baseline that accompanies them: behavior lives with the data it operates on
+(encapsulation — see anemic-model rule §1); inheritance only for true is-a
+relationships, composition otherwise; no `instanceof`/type-switch chains where
+polymorphism does the job.
 
 ---
 
-## 3. Exception Handling
+## 3. ApiResponse\<T\> Envelope
 
-### 3.1 GlobalExceptionHandler
+Every endpoint in every service returns the shared envelope defined ONCE in
+`commons-core` (`com.financialapp.commons.core.response.ApiResponse`, built from
+`financial-app-parent`). Services MUST NOT define their own envelope class.
 
-Every service has exactly one `@RestControllerAdvice` class named `GlobalExceptionHandler` in `web/error/` (current divergence: ms-finances names its handler `DomainExceptionHandler` — rename pending, tracked in [IDEAS.md](IDEAS.md)). It is the only place that converts exceptions to HTTP responses. No controller method has a `try/catch` for the purpose of shaping error responses.
+### 3.1 Fields
 
-### 3.2 Exception hierarchy
+| Field | Type | Notes |
+| :-- | :-- | :-- |
+| `status` | `int` | HTTP status code; mirrors the response line. |
+| `title` | `String` | HTTP reason phrase, always (`"OK"`, `"Created"`, `"Conflict"`). |
+| `code` | `String` | Machine-readable error slug from the service's `DomainError` catalog. Errors only — hidden on success (`@JsonInclude(NON_NULL)`). |
+| `message` | `String` | Human-readable note. Optional on success, always present on error. |
+| `data` | `T` (any) | Payload on success; structured error details (validation field map, constraint info) on error. Omitted when null. |
+
+### 3.2 Success example
+
+```json
+{
+  "status": 201,
+  "title": "Created",
+  "message": "Account created",
+  "data": { "cbu": "2850590940090418135201" }
+}
+```
+
+### 3.3 Error examples
+
+```json
+{
+  "status": 422,
+  "title": "Unprocessable Entity",
+  "code": "account_insufficient_funds",
+  "message": "Balance 100.00 ARS is less than requested 250.00 ARS",
+  "data": { "missing": "150.00" }
+}
+```
+
+```json
+{
+  "status": 400,
+  "title": "Bad Request",
+  "code": "validation_error",
+  "message": "Request validation failed",
+  "data": { "amount": "must be positive", "currency": "is required" }
+}
+```
+
+### 3.4 Controller usage
+
+- `200` — `ResponseEntity.ok(ApiResponse.ok(data))` or `ApiResponse.ok(message, data)`
+- `201` — `ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created("Created", data))`
+- Deletes return **200 + envelope** (not 204) — keeps the envelope universal.
+- Errors — produced by the shared `ApiExceptionHandler` base (commons-web) or, for
+  service-specific framework exceptions, by `ApiResponse.failure(status, code, message, details)`.
+- Every endpoint declares its throwable error codes with `@ApiErrorCodes(catalog = DomainError.class,
+  value = {...})` — springdoc examples are generated by `ErrorCodeOperationCustomizer`
+  (commons-web auto-configuration), so Swagger never drifts from the catalog.
+
+> **No second envelope class, no per-service `ApiResponse`.** Dropped fields from the previous
+> standard: `success` (derive from `status`), `timestamp` (unused), `errors` list (replaced by the
+> `data` details map).
+
+---
+
+## 4. Exception Handling
+
+### 4.1 GlobalExceptionHandler
+
+Every servlet service has exactly one `@RestControllerAdvice` class named `GlobalExceptionHandler`
+in `web/error/` that **extends `ApiExceptionHandler`** (commons-web). The base provides the
+handlers for `DomainException`, bean validation (field map in `data`), malformed JSON,
+`DataIntegrityViolationException` (with the `constraintMessages()` template-method hook), and the
+generic 500 fallback. Subclasses add only service-specific framework handlers (JWT, Feign,
+multipart, ...). ms-gateway (WebFlux) consumes commons-core only and renders the same envelope
+from its reactive error paths. No controller method has a `try/catch` for the purpose of shaping
+error responses.
+
+### 4.2 Exception hierarchy
 
 ```
 DomainException (abstract)
@@ -88,7 +136,7 @@ DomainException (abstract)
 
 `InfrastructureException` lives in `domain/exception/` and extends `DomainException`, not in the infrastructure layer (canonical: ms-banks. Current divergence: ms-investments places it in `infrastructure/exception/` and extends `RuntimeException` — migration pending, tracked in [IDEAS.md](IDEAS.md)).
 
-### 3.3 DomainError → HTTP status mapping
+### 4.3 DomainError → HTTP status mapping
 
 The `DomainError` enum owns every HTTP status and machine-readable code string. No HTTP status is assigned at a throw site.
 
@@ -112,7 +160,7 @@ The `DomainError` enum owns every HTTP status and machine-readable code string. 
 | `MethodArgumentNotValidException` (framework) | 400 | `validation_error` |
 | `DataIntegrityViolationException` (framework) | 409 | `database_conflict` |
 
-### 3.4 Exception selection guide
+### 4.4 Exception selection guide
 
 | Situation | What to throw |
 | :-- | :-- |
@@ -126,13 +174,13 @@ The `DomainError` enum owns every HTTP status and machine-readable code string. 
 | DB unique constraint fired | No action — handler catches `DataIntegrityViolationException` automatically |
 | Unexpected runtime failure | Let it bubble to `handleGeneric` → `internal_error` |
 
-### 3.5 Catch order
+### 4.5 Catch order
 
 When a use case may receive both `InfrastructureException` and other `DomainException` subtypes, `catch (InfrastructureException e)` MUST come before `catch (DomainException e)`. `InfrastructureException` extends `DomainException` — reversing the order causes it to be silently consumed.
 
 ---
 
-## 4. Configuration
+## 5. Configuration
 
 | Rule | Detail |
 | :-- | :-- |
@@ -144,7 +192,7 @@ When a use case may receive both `InfrastructureException` and other `DomainExce
 
 ---
 
-## 5. Persistence
+## 6. Persistence
 
 | Rule | Detail |
 | :-- | :-- |
@@ -156,7 +204,7 @@ When a use case may receive both `InfrastructureException` and other `DomainExce
 
 ---
 
-## 6. Code Comments
+## 7. Code Comments
 
 > **Comments are added ONLY when the user explicitly asks, or explicitly asks WHY something is implemented a certain way.**
 
@@ -170,7 +218,7 @@ Method-level Javadoc on public API surface (ports, use cases) is acceptable when
 
 ---
 
-## 7. Supported Currencies
+## 8. Supported Currencies
 
 Currency acceptance is a business policy, not a compile-time constant. The pattern below applies to every service that gates writes by currency.
 
