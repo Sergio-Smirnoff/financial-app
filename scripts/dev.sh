@@ -110,6 +110,11 @@ cmd_monitor() {
     echo "  loki       → http://localhost:3100"
 }
 
+ensure_commons() {
+    info "Installing financial-app-parent (BOM + commons modules)..."
+    mvn -f "$SCRIPT_DIR/back/financial-app-parent/pom.xml" -B -q -DskipTests install
+}
+
 cmd_local() {
     local svc="${1:-}"
     if [[ -z "$svc" ]]; then
@@ -130,6 +135,7 @@ cmd_local() {
     header "Local dev — $svc (hot reload)"
     check_docker
     check_env
+    ensure_commons
 
     info "Starting infrastructure..."
     docker compose up -d $INFRA_SERVICES
@@ -377,6 +383,7 @@ cmd_local_all() {
     header "Starting local dev environment"
     check_docker
     check_env
+    ensure_commons
     mkdir -p "$LOGS_DIR"
     > "$PIDS_FILE"
 
