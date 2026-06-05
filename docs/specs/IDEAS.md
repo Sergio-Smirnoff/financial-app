@@ -19,7 +19,6 @@ it's ready to build.
 - 
 
 ### Improvements & refactors
-- Change all the responses of the APIs, structure: {code: "", codeName: "", message: "", data:"", details: [specific fields that were triggered]} // for this view archived spec
 - Change all the JWT system and the auth tokens
 - Add or reincert kafka topics, specific for each emmision and notification track all that. Fix the kafka headers 
 - refactor some pages of the front end: banks, investments, categories, configuration, uploads
@@ -48,6 +47,7 @@ it's ready to build.
 
 - Host the application on the cloud → researched, spec: [2026-06-05-cloud-hosting-research.md](../superpowers/specs/2026-06-05-cloud-hosting-research.md)
 - Java 25 migration → researched, decision: Boot 4.0 + SC 2025.1 + Java 25, spec: [2026-06-05-java-25-spring-boot-4-migration.md](../superpowers/specs/2026-06-05-java-25-spring-boot-4-migration.md)
+- GitHub Actions CI pipeline + branch protections → designed, spec: [2026-06-05-github-actions-ci-pipeline-design.md](../superpowers/specs/2026-06-05-github-actions-ci-pipeline-design.md)
 
 ---
 

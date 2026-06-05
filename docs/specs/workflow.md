@@ -82,4 +82,33 @@ When a single logical change touches multiple repos, create one commit per repo.
 
 ---
 
+## CI/CD
+
+Central reusable workflows live in this root repo (`.github/workflows/`); every service
+repo holds thin callers referencing them `@master`.
+
+| Reusable workflow | Used by | Does |
+|---|---|---|
+| `backend-ci.yml` | 7 backend services | parent install → `mvn verify` → docker build (no push) |
+| `frontend-ci.yml` | frontend | `npm ci` → lint → build → docker build (no push) |
+| `parent-ci.yml` | financial-app-parent | `mvn verify` on commons modules |
+| `backend-publish.yml` / `frontend-publish.yml` | 8 repos | build + push GHCR: `latest`, `sha-*`, semver on release |
+| `release.yml` | 8 repos | bump dropdown → next `vX.Y.Z` tag + GitHub Release → publish |
+
+Triggers per service repo:
+- `ci.yml`: every PR + push to develop/master → status check `ci / build`
+- `docker-publish.yml`: push to master or `v*` tag
+- `release.yml`: manual (Actions tab dropdown) or `scripts/github/release.sh <bump> <service...|all>`
+
+Branch rulesets (applied via `scripts/github/apply-rulesets.sh`, JSON in `.github/rulesets/`):
+- `master`: PR required, `ci / build` check required, Copilot auto-review, no force-push/delete
+- `develop`: no force-push/delete; direct push allowed (local merge flow preserved)
+
+Release flow: merge develop→master via PR → trigger Release with bump type
+(major/minor/patch) → image published as `X.Y.Z` + `X.Y` + `latest` + `sha-*`.
+
+Spec: `docs/superpowers/specs/2026-06-05-github-actions-ci-pipeline-design.md`
+
+---
+
 [Master](00-master.md) | [Rules](rules.md) | [Architecture](architecture.md)
