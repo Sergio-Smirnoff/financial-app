@@ -50,19 +50,34 @@ ms-banks owns the user's financial instruments at the bank level: the bank catal
 
 ### Response Envelope
 
-All endpoints return the canonical `ApiResponse<T>`:
+All endpoints return the shared `ApiResponse<T>` from `commons-core` (built from
+`financial-app-parent`):
 
 ```json
 {
-  "success": true,
-  "message": "...",
-  "data": { ... },
-  "errors": null,
-  "timestamp": "2026-06-04T..."
+  "status": 201,
+  "title": "Created",
+  "message": "Account created",
+  "data": { "...": "..." }
 }
 ```
 
-Error responses follow `ErrorResponse { status, code, message, details }` at 4xx/5xx.
+Errors use the SAME class — `code` carries the `DomainError` slug, details travel in `data`:
+
+```json
+{
+  "status": 422,
+  "title": "Unprocessable Entity",
+  "code": "account_insufficient_funds",
+  "message": "Balance 100.00 ARS is less than requested 250.00 ARS",
+  "data": { "missing": "150.00" }
+}
+```
+
+`GlobalExceptionHandler extends ApiExceptionHandler` (commons-web) renders all errors; the
+service-specific part is only the `constraintMessages()` override (unique-constraint texts).
+Every endpoint declares its throwable codes with `@ApiErrorCodes(catalog = DomainError.class, ...)`
+— Swagger examples are generated from the catalog. There is NO separate `ErrorResponse` class.
 
 ---
 
@@ -311,7 +326,7 @@ back/ms-banks/src/main/java/com/financialapp/banks/
 │   │   └── UpcomingPaymentController
 │   ├── dto/
 │   │   ├── request/                (AccountRequest, CardRequest, LoanRequest, …)
-│   │   └── response/               (ApiResponse, AccountResponse, CardResponse, …)
+│   │   └── response/               (AccountResponse, CardResponse, … — envelope from commons-core)
 │   ├── mapper/                     (AccountWebMapper, CardWebMapper, LoanWebMapper, …)
 │   └── error/                      (GlobalExceptionHandler)
 │

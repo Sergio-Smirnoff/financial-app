@@ -83,8 +83,7 @@ back/ms-users/src/main/java/com/financialapp/users/
     │   │   ├── LoginRequest.java
     │   │   └── RegisterRequest.java
     │   └── response/
-    │       ├── ApiResponse.java
-    │       └── AuthResponse.java
+    │       └── AuthResponse.java        (envelope ApiResponse comes from commons-core)
     └── error/
         └── GlobalExceptionHandler.java
 ```
@@ -94,6 +93,10 @@ back/ms-users/src/main/java/com/financialapp/users/
 ## Endpoints
 
 All routes under `/api/v1/auth`. The gateway's `JwtAuthFilter` marks this path prefix as exempt from JWT validation.
+
+All responses use the shared envelope `{ status, title, code, message, data }` from `commons-core`;
+`code` appears only on errors with the `DomainError` slug. `GlobalExceptionHandler extends
+ApiExceptionHandler` (commons-web); endpoints declare throwable codes with `@ApiErrorCodes`.
 
 | Method | Path | Request body | Success response | HTTP status |
 |--------|------|-------------|-----------------|------------|
@@ -106,14 +109,14 @@ All routes under `/api/v1/auth`. The gateway's `JwtAuthFilter` marks this path p
 
 ### Error responses
 
-| Scenario | HTTP status |
-|----------|------------|
-| Email already exists | `409 Conflict` |
-| Wrong email or password | `401 Unauthorized` |
-| Invalid / expired JWT | `401 Unauthorized` |
-| Missing `refresh_token` cookie | `401 Unauthorized` |
-| User not found during refresh | `404 Not Found` |
-| Bean validation failure | `400 Bad Request` |
+| Scenario | HTTP status | `code` |
+|----------|------------|--------|
+| Email already exists | `409 Conflict` | `email_already_registered` |
+| Wrong email or password | `401 Unauthorized` | `invalid_credentials` |
+| Invalid / expired JWT | `401 Unauthorized` | `invalid_token` |
+| Missing `refresh_token` cookie | `401 Unauthorized` | `authentication_required` |
+| User not found during refresh | `404 Not Found` | `user_not_found` |
+| Bean validation failure | `400 Bad Request` | `validation_error` (field map in `data`) |
 
 ---
 

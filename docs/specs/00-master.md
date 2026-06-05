@@ -39,7 +39,7 @@ graph TD
 | Spec | What it covers |
 |---|---|
 | [architecture.md](architecture.md) | Polyrepo topology, runtime topology (gateway → services), auth/cookie/CSRF flow, Postgres schemas, Kafka, MinIO, DDD layering |
-| [rules.md](rules.md) | Implementation rules: DDD always, `ApiResponse<T>` envelope, exception handling, env-config, Flyway, MapStruct/Lombok, no-comments rule, supported currencies |
+| [rules.md](rules.md) | Implementation rules: DDD always, SOLID, shared `{status, title, code, message, data}` envelope (commons-core), exception handling via commons `ApiExceptionHandler` + per-service `DomainError` catalogs, `@ApiErrorCodes` Swagger docs, env-config, Flyway, MapStruct/Lombok, no-comments rule, supported currencies |
 | [workflow.md](workflow.md) | Branching (`master → feature → develop`, per repo), commit rules (no push / no co-author / no commit unless asked), read-before-plan, update-docs-after-impl |
 | [deployment.md](deployment.md) | `scripts/dev.sh` commands, port map, env vars, Docker vs local, startup flow |
 | [IDEAS.md](IDEAS.md) | Running backlog of future ideas, improvements, and things to keep in mind |

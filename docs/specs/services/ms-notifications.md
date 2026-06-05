@@ -100,7 +100,6 @@ ms-notifications/src/main/java/com/financialapp/notifications/
     ├── dto/
     │   ├── request/NotificationPreferenceRequest.java
     │   └── response/
-    │       ├── ApiResponse.java
     │       ├── NotificationPreferenceResponse.java
     │       ├── NotificationResponse.java
     │       └── UnreadCountResponse.java
@@ -234,7 +233,11 @@ data: { id, userId, type, title, message, channel, read, metadata, createdAt }
 | `GET` | `/api/v1/notifications/preferences` | Get current user's notification preferences |
 | `PUT` | `/api/v1/notifications/preferences` | Update preferences (`monthlyEmailEnabled`) |
 
-All controllers read `X-User-Id` from the request header. Responses are wrapped in `ApiResponse<T>`.
+All controllers read `X-User-Id` from the request header. Responses use the shared envelope
+`{ status, title, code, message, data }` from `commons-core`; `code` only on errors with the
+`DomainError` slug (`resource_not_found`, `user_not_found`, `business_rule_violation`).
+`GlobalExceptionHandler extends ApiExceptionHandler` (commons-web); endpoints declare throwable
+codes with `@ApiErrorCodes`. The SSE stream endpoint is exempt (not a JSON envelope response).
 
 ---
 

@@ -24,7 +24,7 @@ ms-gateway is the edge service that every browser and external client talks to. 
 | 6 | **Swagger proxy** — rewrites `/v3/api-docs/{service}` to each service's own `/v3/api-docs`; the aggregated Swagger UI at `/swagger-ui.html` lists all six services | `application.yml` api-docs routes |
 | 7 | **CORS** — `CorsWebFilter` at `HIGHEST_PRECEDENCE`; origins from `ALLOWED_ORIGINS` env var; `credentials: true`; CORS headers also injected on error responses by `ErrorResponseRenderer` | `CorsConfig` |
 | 8 | **Timeout policy** — all outbound WebClient calls (BFF fan-out) honour a `TimeoutPolicy` VO; default 3 000 ms, tunable via `GATEWAY_TIMEOUT_PER_CALL_MS` | `TimeoutPolicy`, `ResilienceConfig` |
-| 9 | **Error normalization** — any unhandled exception is serialised into `ApiResponse.error(message)` with an appropriate HTTP status | `GatewayErrorWebExceptionHandler`, `ErrorResponseRenderer` |
+| 9 | **Error normalization** — any unhandled exception is serialised into the shared envelope `ApiResponse.failure(status, code, message, null)` (commons-core); gateway codes: `unauthorized` (401), `rate_limit_exceeded` (429), `upstream_unavailable` (502/503/504), `internal_error` (500). Downstream error bodies pass through with their own `code` preserved | `GatewayErrorWebExceptionHandler`, `ErrorResponseRenderer`, `GlobalExceptionHandler` |
 
 ---
 
@@ -182,10 +182,10 @@ back/ms-gateway/src/main/java/com/financialapp/gateway/
     ├── controller/
     │   └── DashboardController.java  # GET /api/v1/dashboard/data
     ├── dto/response/
-    │   ├── ApiResponse.java
+    │   ├── (envelope from commons-core)
     │   └── DashboardResponse.java
     ├── error/
-    │   ├── ErrorResponseRenderer.java       # serialises ApiResponse.error(...)
+    │   ├── ErrorResponseRenderer.java       # serialises ApiResponse.failure(status, code, ...)
     │   ├── GatewayErrorWebExceptionHandler.java  # catches routing/connect errors
     │   └── GlobalExceptionHandler.java
     ├── filter/

@@ -35,7 +35,14 @@ graph TD
     Parent -. gitignores .-> Front
 ```
 
-`back/financial-app-parent` is the **Maven BOM** (Spring Boot 3.4.2, Spring Cloud 2024.0.1, Java 21). It is infrastructure, not a runtime service — every backend service inherits its managed dependency versions from it, and microservice `pom.xml` files never declare versions directly.
+`back/financial-app-parent` is the **Maven BOM + commons aggregator** (Spring Boot 3.4.2, Spring Cloud 2024.0.1, Java 21). It is infrastructure, not a runtime service — every backend service inherits its managed dependency versions from it, and microservice `pom.xml` files never declare versions directly. Since 2026-06-05 it also hosts two shared code modules, built by the same `mvn install` at its root:
+
+| Module | Contents | Consumed by |
+| :-- | :-- | :-- |
+| `commons-core` | `ApiResponse` envelope `{status, title, code, message, data}`, `ErrorCategory`, `ErrorCode` interface, `DomainException` base | all 7 services (framework-free except `HttpStatus`/Jackson — safe in domain layers) |
+| `commons-web` | `ApiExceptionHandler` base advice, static `ErrorCategoryHttpMapper`, `CommonErrorCode`, `@ApiErrorCodes` + Swagger error-example generation, OpenAPI auto-config | the 6 servlet services (ms-gateway is WebFlux → commons-core only) |
+
+Services MUST build `financial-app-parent` (`mvn install`) before their own build — `dev.sh` and every service Dockerfile do this automatically.
 
 ---
 
@@ -147,7 +154,7 @@ graph LR
 
 The domain layer never imports from web, application, or infrastructure. Use cases live in the application layer and orchestrate domain logic; adapters in the infrastructure layer implement domain-defined ports.
 
-The bridge type `InfrastructureException` canonically lives **in the domain layer** (extending `DomainException`), not in infrastructure: an infrastructure adapter throws it to signal a failure without importing typed domain service exceptions, and a use case catches it and re-throws a specific named domain exception (such as `FinancesServiceException` or `InvestmentsServiceException`). A single `GlobalExceptionHandler` per service serializes every failure into one uniform `ApiResponse` error shape. (Current code divergences from this canon are tracked in [rules.md](rules.md) and [IDEAS.md](IDEAS.md).)
+The bridge type `InfrastructureException` canonically lives **in the domain layer** (extending the commons `DomainException`), not in infrastructure: an infrastructure adapter throws it to signal a failure without importing typed domain service exceptions, and a use case catches it and re-throws a specific named domain exception (such as `FinancesServiceException` or `InvestmentsServiceException`). A single `GlobalExceptionHandler` per service — extending the commons `ApiExceptionHandler` — serializes every failure into the shared `{status, title, code, message, data}` envelope, with the machine-readable `code` taken from the service's `DomainError` catalog (each catalog implements the commons `ErrorCode` interface). See [rules.md](rules.md) §3–4 for the full contract.
 
 ---
 
