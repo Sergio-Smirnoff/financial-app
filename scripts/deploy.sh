@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 # =============================================================================
-# deploy.sh — Clone or update all financial-app repositories on a fresh server
+# deploy.sh — Bootstrap or update a financial-app server (root repo only)
 # =============================================================================
+# Images are prebuilt by CI and pulled from GHCR — service sources are NOT
+# needed on the server. Only this root repo (compose files, infra/, scripts/).
+#
 # Usage:
 #   chmod +x scripts/deploy.sh
-#   ./scripts/deploy.sh               # Clone all repos (first time)
-#   ./scripts/deploy.sh --update      # Pull latest on all repos (subsequent deploys)
+#   ./scripts/deploy.sh               # First run: .env wizard + GHCR login
+#   ./scripts/deploy.sh --update      # Pull root repo + images, restart services
+#
+# Image versions: set <SERVICE>_VERSION vars in .env to pin semver tags
+# (e.g. FINANCES_VERSION=1.2.0); unset = latest. Rollback = set previous
+# version and re-run with --update.
 #
 # Prerequisites on server:
-#   - git installed
-#   - SSH key added to GitHub (run: ssh -T git@github.com  to verify)
+#   - git installed (this repo cloned)
 #   - docker + docker compose v2 installed
 # =============================================================================
 
@@ -22,33 +28,6 @@ UPDATE_MODE=false
 if [[ "${1:-}" == "--update" ]]; then
   UPDATE_MODE=true
 fi
-
-# ---------------------------------------------------------------------------
-# Repository map: relative_path -> github_repo
-# ---------------------------------------------------------------------------
-REPO_PATHS=(
-  "back/financial-app-parent"
-  "back/ms-gateway"
-  "back/ms-users"
-  "back/ms-finances"
-  "back/ms-banks"
-  "back/ms-notifications"
-  "back/ms-upload"
-  "back/ms-investments"
-  "front/financial-app"
-)
-
-REPO_URLS=(
-  "git@github.com:Sergio-Smirnoff/financial-app-back-financial-app-parent.git"
-  "git@github.com:Sergio-Smirnoff/financial-app-back-ms-gateway.git"
-  "git@github.com:Sergio-Smirnoff/financial-app-back-ms-users.git"
-  "git@github.com:Sergio-Smirnoff/financial-app-back-ms-finances.git"
-  "git@github.com:Sergio-Smirnoff/financial-app-back-ms-banks.git"
-  "git@github.com:Sergio-Smirnoff/financial-app-back-ms-notifications.git"
-  "git@github.com:Sergio-Smirnoff/financial-app-back-ms-upload.git"
-  "git@github.com:Sergio-Smirnoff/financial-app-back-ms-investments.git"
-  "git@github.com:Sergio-Smirnoff/financial-app-front-financial-app.git"
-)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -64,47 +43,15 @@ warn()  { echo -e "${YELLOW}[warn]${NC}  $*"; }
 error() { echo -e "${RED}[error]${NC} $*" >&2; }
 
 # ---------------------------------------------------------------------------
-# Verify GitHub SSH access
-# ---------------------------------------------------------------------------
-info "Verifying GitHub SSH access..."
-ssh_output=$(ssh -o StrictHostKeyChecking=no -T git@github.com 2>&1 || true)
-if ! echo "$ssh_output" | grep -q "successfully authenticated"; then
-  error "SSH key not authorized for GitHub."
-  echo ""
-  echo "  On this server, run:"
-  echo "    ssh-keygen -t ed25519 -C 'server-deploy'"
-  echo "    cat ~/.ssh/id_ed25519.pub"
-  echo "  Then add that key at: https://github.com/settings/ssh/new"
-  echo ""
-  exit 1
-fi
-info "GitHub SSH OK."
-
-# ---------------------------------------------------------------------------
-# Clone or update each service repo
+# Update root repo (compose files, infra/, scripts/) — images come from GHCR
 # ---------------------------------------------------------------------------
 cd "$DEPLOY_DIR"
 
-for i in "${!REPO_PATHS[@]}"; do
-  rel_path="${REPO_PATHS[$i]}"
-  repo_url="${REPO_URLS[$i]}"
-  abs_path="$DEPLOY_DIR/$rel_path"
-
-  if [[ -d "$abs_path/.git" ]]; then
-    if $UPDATE_MODE; then
-      info "Updating  $rel_path (master branch) ..."
-      git -C "$abs_path" checkout master 2>/dev/null || true
-      git -C "$abs_path" pull --ff-only origin master 2>&1 | tail -1
-    else
-      warn "Already exists: $rel_path  (skipping — use --update to pull)"
-    fi
-  else
-    info "Cloning   $rel_path ..."
-    mkdir -p "$(dirname "$abs_path")"
-    git clone "$repo_url" "$abs_path"
-    git -C "$abs_path" checkout master 2>/dev/null || true
-  fi
-done
+if $UPDATE_MODE; then
+  info "Updating root repo (master branch) ..."
+  git -C "$DEPLOY_DIR" checkout master 2>/dev/null || true
+  git -C "$DEPLOY_DIR" pull --ff-only origin master 2>&1 | tail -1
+fi
 
 # ---------------------------------------------------------------------------
 # Verify or Generate .env
@@ -216,14 +163,30 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Done
+# Update mode: pull pinned/latest images and restart the stack
+# ---------------------------------------------------------------------------
+if $UPDATE_MODE; then
+  info "Pulling app images (versions from .env, default latest) ..."
+  docker compose -f docker-compose.yml --profile app pull
+  info "Restarting stack ..."
+  docker compose -f docker-compose.yml --profile app up -d
+  success "Deploy updated. Status:"
+  docker compose -f docker-compose.yml ps
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Done (first run)
 # ---------------------------------------------------------------------------
 echo ""
-info "All repos ready. Next steps for Production Deployment:"
+info "Server bootstrapped. Next steps for Production Deployment:"
 echo ""
 echo "  1. Start infra:   docker compose -f docker-compose.yml up -d postgres zookeeper kafka minio traefik duckdns"
 echo "  2. Pull images:   docker compose -f docker-compose.yml --profile app pull"
 echo "  3. Start app:     docker compose -f docker-compose.yml --profile app up -d"
+echo ""
+echo "  Subsequent deploys:  ./scripts/deploy.sh --update   (pulls repo + images, restarts)"
+echo "  Pin versions:        set <SERVICE>_VERSION in .env (e.g. FINANCES_VERSION=1.2.0)"
 echo ""
 echo "  Optional (Manual Monitoring):"
 echo "  4. Pull monitor:  docker compose -f docker-compose.monitoring.yml pull"

@@ -269,8 +269,8 @@ cmd_prod() {
     check_docker
     check_env
 
-    info "Building app images..."
-    docker compose -f docker-compose.yml --profile app build
+    info "Pulling app images from GHCR (versions from .env, default latest)..."
+    docker compose -f docker-compose.yml --profile app pull
 
     info "Starting infrastructure..."
     docker compose -f docker-compose.yml up -d $INFRA_SERVICES

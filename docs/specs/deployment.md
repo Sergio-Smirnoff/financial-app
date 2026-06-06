@@ -159,6 +159,18 @@ Images are published to GitHub Container Registry (`ghcr.io/sergio-smirnoff/<ser
 
 `scripts/github/promote.sh <service...|all>` handles the develop→master PR + wait + merge before a release.
 
+**Version pinning on the server:** every app service in `docker-compose.yml` reads its image
+tag from `.env` — `GATEWAY_VERSION`, `USERS_VERSION`, `FINANCES_VERSION`, `BANKS_VERSION`,
+`NOTIFICATIONS_VERSION`, `UPLOAD_VERSION`, `INVESTMENTS_VERSION`, `FRONTEND_VERSION` —
+defaulting to `latest`. Pin a semver tag (e.g. `FINANCES_VERSION=1.2.0`) to deploy an exact
+release; rollback = set the previous version and re-run
+`docker compose --profile app up -d` (or `./scripts/deploy.sh --update`).
+
+**Server needs the root repo only.** Images are prebuilt by CI — service sources are never
+cloned on the server. `scripts/deploy.sh` bootstraps `.env` + GHCR login on first run;
+`./scripts/deploy.sh --update` pulls the root repo, pulls images (honouring the
+`*_VERSION` pins), and restarts the stack in one command.
+
 See [workflow.md](workflow.md) § CI/CD for the full workflow table, required PAT scopes, and
 failure-triage scripts.
 
@@ -172,7 +184,7 @@ content is folded into this spec). It includes:
 - GitHub Container Registry (GHCR) authentication
 - Traefik + Let's Encrypt SSL configuration
 - DuckDNS dynamic DNS
-- `scripts/deploy.sh` first-run and `--update` workflow
+- `scripts/deploy.sh` first-run (.env wizard + GHCR login) and `--update` (root repo pull + image pull + restart) workflow — root repo only, no service sources on the server
 - `scripts/backup.sh` for PostgreSQL + MinIO snapshots
 - Common troubleshooting (DB connection refused, Kafka OOM, Traefik 502, CORS errors, memory limits)
 

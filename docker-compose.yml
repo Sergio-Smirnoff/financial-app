@@ -100,7 +100,7 @@ services:
 
   gateway:
     profiles: [app]
-    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-gateway:latest
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-gateway:${GATEWAY_VERSION:-latest}
     container_name: gateway
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
@@ -136,7 +136,7 @@ services:
 
   service-users:
     profiles: [app]
-    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-users:latest
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-users:${USERS_VERSION:-latest}
     container_name: service-users
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
@@ -162,7 +162,7 @@ services:
 
   service-finances:
     profiles: [app]
-    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-finances:latest
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-finances:${FINANCES_VERSION:-latest}
     container_name: service-finances
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
@@ -185,7 +185,7 @@ services:
 
   service-banks:
     profiles: [app]
-    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-banks:latest
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-banks:${BANKS_VERSION:-latest}
     container_name: service-banks
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
@@ -208,7 +208,7 @@ services:
 
   service-notifications:
     profiles: [app]
-    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-notifications:latest
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-notifications:${NOTIFICATIONS_VERSION:-latest}
     container_name: service-notifications
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
@@ -241,7 +241,7 @@ services:
 
   service-upload:
     profiles: [app]
-    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-upload:latest
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-upload:${UPLOAD_VERSION:-latest}
     container_name: service-upload
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx384m -Xms128m"
@@ -269,7 +269,7 @@ services:
 
   service-investments:
     profiles: [app]
-    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-investments:latest
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-investments:${INVESTMENTS_VERSION:-latest}
     container_name: service-investments
     environment:
       JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
@@ -294,7 +294,7 @@ services:
 
   frontend:
     profiles: [app]
-    image: ghcr.io/sergio-smirnoff/financial-app-front-financial-app:latest
+    image: ghcr.io/sergio-smirnoff/financial-app-front-financial-app:${FRONTEND_VERSION:-latest}
     container_name: frontend
     environment:
       NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL}
