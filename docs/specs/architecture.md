@@ -158,4 +158,22 @@ The bridge type `InfrastructureException` canonically lives **in the domain laye
 
 ---
 
+## 6. CI/CD
+
+Central reusable GitHub Actions workflows live in the root repo (`Sergio-Smirnoff/financial-app`,
+`.github/workflows/`). Every service repo carries thin caller workflows that reference them
+`@master`. The five reusable workflows are: `backend-ci`, `frontend-ci`, `parent-ci` (CI-only for
+the Maven BOM), `backend-publish`, and `frontend-publish`.
+
+Every PR and push to `develop`/`master` triggers the `ci / build` status check (`ci.yml` caller).
+Branch rulesets on all nine repos enforce this check as required on `master` — merging requires a
+passing PR. Docker images are published to GHCR on every `master` push (`latest` + `sha-<shortsha>`)
+and on every `v*` tag (`X.Y.Z` + `X.Y` + `latest` + `sha-<shortsha>`). Releases are cut via the
+per-repo `release.yml` Actions dropdown or `scripts/github/release.sh`.
+
+See [workflow.md](workflow.md) § CI/CD for the full workflow table, ruleset details, scripts, and
+required PAT permissions.
+
+---
+
 [Master](00-master.md) · [Rules](rules.md) · [Workflow](workflow.md) · [Deployment](deployment.md)

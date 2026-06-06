@@ -141,7 +141,30 @@ Logs land in `./logs/<service>.log`. Use `./scripts/dev.sh logs-local [svc]` to 
 
 ---
 
-## 6. Production Server Setup (CasaOS)
+## 6. GHCR Image Tags and Releases
+
+Images are published to GitHub Container Registry (`ghcr.io/sergio-smirnoff/<service>`) by the
+`docker-publish.yml` caller in each repo (delegates to the reusable `backend-publish.yml` /
+`frontend-publish.yml` in the root repo).
+
+| Event | Tags applied |
+|---|---|
+| Push to `master` | `latest`, `sha-<shortsha>` |
+| `v*` tag (from `release.yml` or `scripts/github/release.sh`) | `X.Y.Z`, `X.Y`, `latest`, `sha-<shortsha>` |
+
+**Releasing a service:**
+- Via Actions UI: go to the service repo → Actions → `release.yml` → Run workflow → pick bump type
+  (`major` / `minor` / `patch`). The caller enforces a `master`-only guard.
+- Via CLI: `scripts/github/release.sh <bump> <service...|all>` — wraps the API trigger.
+
+`scripts/github/promote.sh <service...|all>` handles the develop→master PR + wait + merge before a release.
+
+See [workflow.md](workflow.md) § CI/CD for the full workflow table, required PAT scopes, and
+failure-triage scripts.
+
+---
+
+## 7. Production Server Setup (CasaOS)
 
 The full server setup guide is archived at `docs/superpowers/archive/DEPLOYMENT.md` (its
 content is folded into this spec). It includes:

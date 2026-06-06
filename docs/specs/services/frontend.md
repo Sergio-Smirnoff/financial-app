@@ -260,4 +260,15 @@ All forms use `react-hook-form` with `zod` resolvers. Schemas live in `lib/schem
 
 ---
 
+## CI/CD
+
+Thin caller workflows (`.github/workflows/`) delegate to the shared workflows in the root repo:
+`ci.yml` (PRs + develop/master pushes → `npm ci` + lint + build + Docker build; required check
+`ci / build`), `docker-publish.yml` (master push / `v*` tag → GHCR `latest` + `sha-*` + semver),
+`release.yml` (bump dropdown → semver release). The build must pass without any backend running —
+`NEXT_PUBLIC_GATEWAY_URL` is set to a placeholder value during CI.
+See [../workflow.md](../workflow.md) § CI/CD.
+
+---
+
 [Master](../00-master.md) | [Architecture](../architecture.md) | [Rules](../rules.md) | [Workflow](../workflow.md)

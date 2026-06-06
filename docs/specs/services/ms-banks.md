@@ -411,4 +411,15 @@ back/ms-banks/src/main/java/com/financialapp/banks/
 
 ---
 
+## CI/CD
+
+Thin caller workflows (`.github/workflows/`) delegate to the shared workflows in the root repo:
+`ci.yml` (PRs + develop/master pushes → `mvn verify` + Docker build; required check `ci / build`),
+`docker-publish.yml` (master push / `v*` tag → GHCR `latest` + `sha-*` + semver),
+`release.yml` (bump dropdown → semver release). Tests must pass without local infra — CI runs on a
+bare runner; integration tests use H2 and `EmbeddedKafka` where needed.
+See [../workflow.md](../workflow.md) § CI/CD.
+
+---
+
 [Master](../00-master.md) | [Architecture](../architecture.md) | [Rules](../rules.md) | [Workflow](../workflow.md)
