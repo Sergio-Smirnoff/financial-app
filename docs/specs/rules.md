@@ -257,8 +257,8 @@ and blocks merging to `master`.
 
 | Rule | Detail |
 | :-- | :-- |
-| `mvn -B verify` must pass without local infra | CI runs on a bare GitHub Actions runner — no Postgres, no Kafka, no MinIO available. Integration tests that need a DB must use H2 (or a sliced `@SpringBootTest`). Tests that need Kafka must use `EmbeddedKafka`. Tests that call MinIO must be excluded from the `verify` phase or use an in-process fake. |
-| No `-DskipTests` workarounds | CI always compiles and runs tests. `DskipTests` is banned in the CI workflow. Flaky or infra-dependent tests that cannot be made infra-free must be tagged `@Tag("integration")` and excluded via Surefire config — do not suppress the whole test suite. |
+| `mvn -B verify` must pass without local infra | CI runs on a bare GitHub Actions runner — no Postgres, no Kafka, no MinIO available. Integration tests that need a DB must use H2 (or a sliced `@SpringBootTest`). Tests that need Kafka must use `EmbeddedKafka`. Tests that need MinIO must use an in-process fake. |
+| No test suppression | Never skip, tag-exclude, or `@Disabled` a failing test to get CI green — fix the root cause (slice the context, use an embedded substitute, or correct the test's contract). Note `-DskipTests` elsewhere (e.g. Dockerfiles) still compiles tests, so stale test code breaks Docker builds too. |
 | Jacoco coverage gates are enforced on every PR | The `backend-ci` reusable workflow runs `mvn verify` with the Jacoco plugin. Coverage thresholds defined in each service's `pom.xml` must pass. Dropping coverage below threshold fails the check. |
 | `develop` → `master` only via PR with green `ci / build` | Direct pushes to `master` are blocked by the branch ruleset. Use `scripts/github/promote.sh <service...\|all>` or open a PR manually. The promotion script creates the PR, waits for the CI check, and merges automatically. |
 
