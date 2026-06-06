@@ -157,6 +157,7 @@ The gateway aggregates all per-service Swagger docs at a single URL — use `:80
 Reusable GitHub Actions workflows for all service repos live in `.github/workflows/`.
 Branch rulesets in `.github/rulesets/` (apply with `scripts/github/apply-rulesets.sh`).
 Multi-repo releases: `scripts/github/release.sh <major|minor|patch> <service...|all>`.
+Failing-run logs: `scripts/github/fetch-failure-logs.sh` (downloads to `/tmp/ci-logs/`).
 See `docs/specs/workflow.md` § CI/CD.
 
 ## Documentation

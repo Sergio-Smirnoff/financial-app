@@ -101,11 +101,18 @@ Triggers per service repo:
 - `release.yml`: manual (Actions tab dropdown) or `scripts/github/release.sh <bump> <service...|all>`
 
 Branch rulesets (applied via `scripts/github/apply-rulesets.sh`, JSON in `.github/rulesets/`):
-- `master`: PR required, `ci / build` check required, Copilot auto-review, no force-push/delete
+- `master`: PR required, `ci / build` check required, no force-push/delete
 - `develop`: no force-push/delete; direct push allowed (local merge flow preserved)
+
+Copilot review: enabled account-wide ("Automatic Copilot code review" in
+Settings → Copilot → Code review) — the ruleset API field is not available on this plan.
 
 Release flow: merge develop→master via PR → trigger Release with bump type
 (major/minor/patch) → image published as `X.Y.Z` + `X.Y` + `latest` + `sha-*`.
+The caller `release.yml` only runs from `master` (`if: github.ref == 'refs/heads/master'`).
+
+Failure triage: `scripts/github/fetch-failure-logs.sh` downloads the latest failing run
+logs to `/tmp/ci-logs/` (needs `GITHUB_TOKEN`).
 
 Spec: `docs/superpowers/specs/2026-06-05-github-actions-ci-pipeline-design.md`
 
