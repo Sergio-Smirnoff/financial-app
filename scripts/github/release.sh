@@ -27,6 +27,8 @@ SERVICES=("$@")
 
 : "${GITHUB_TOKEN:?GITHUB_TOKEN env var required (workflow scope)}"
 
+PAYLOAD=$(python3 -c "import json,sys; print(json.dumps({'ref': 'master', 'inputs': {'bump': sys.argv[1]}}))" "$BUMP")
+
 for svc in "${SERVICES[@]}"; do
   repo=${REPO_MAP[$svc]:-}
   if [[ -z "$repo" ]]; then
@@ -37,6 +39,6 @@ for svc in "${SERVICES[@]}"; do
     -H "Authorization: Bearer $GITHUB_TOKEN" \
     -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/$OWNER/$repo/actions/workflows/release.yml/dispatches" \
-    -d "{\"ref\":\"master\",\"inputs\":{\"bump\":\"$BUMP\"}}"
+    -d "$PAYLOAD"
   echo "$svc: release ($BUMP) triggered"
 done

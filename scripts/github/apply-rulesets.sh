@@ -35,10 +35,17 @@ gh_api() {
   fi
 }
 
+FAILURES=()
+
 for repo in "${REPOS[@]}"; do
   for file in "$RULESET_DIR"/*.json; do
     name=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['name'])" "$file")
-    existing_id=$(gh_api GET "/repos/$OWNER/$repo/rulesets" \
+    if ! rulesets=$(gh_api GET "/repos/$OWNER/$repo/rulesets"); then
+      echo "$repo: failed to list rulesets" >&2
+      FAILURES+=("$repo/$name")
+      continue
+    fi
+    existing_id=$(printf '%s' "$rulesets" \
       | python3 -c "import json,sys; rs=[r['id'] for r in json.load(sys.stdin) if r['name']==sys.argv[1]]; print(rs[0] if rs else '')" "$name")
     if $DRY_RUN; then
       if [[ -n "$existing_id" ]]; then
@@ -49,11 +56,24 @@ for repo in "${REPOS[@]}"; do
       continue
     fi
     if [[ -n "$existing_id" ]]; then
-      gh_api PUT "/repos/$OWNER/$repo/rulesets/$existing_id" "@$file" >/dev/null
-      echo "$repo: updated ruleset '$name' (#$existing_id)"
+      if gh_api PUT "/repos/$OWNER/$repo/rulesets/$existing_id" "@$file" >/dev/null; then
+        echo "$repo: updated ruleset '$name' (#$existing_id)"
+      else
+        echo "$repo: failed to update ruleset '$name'" >&2
+        FAILURES+=("$repo/$name")
+      fi
     else
-      gh_api POST "/repos/$OWNER/$repo/rulesets" "@$file" >/dev/null
-      echo "$repo: created ruleset '$name'"
+      if gh_api POST "/repos/$OWNER/$repo/rulesets" "@$file" >/dev/null; then
+        echo "$repo: created ruleset '$name'"
+      else
+        echo "$repo: failed to create ruleset '$name'" >&2
+        FAILURES+=("$repo/$name")
+      fi
     fi
   done
 done
+
+if (( ${#FAILURES[@]} )); then
+  echo "FAILED: ${FAILURES[*]}" >&2
+  exit 1
+fi
