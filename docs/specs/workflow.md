@@ -111,6 +111,10 @@ Release flow: merge develop→master via PR → trigger Release with bump type
 (major/minor/patch) → image published as `X.Y.Z` + `X.Y` + `latest` + `sha-*`.
 The caller `release.yml` only runs from `master` (`if: github.ref == 'refs/heads/master'`).
 
+Promotion: `scripts/github/promote.sh <service...|all>` creates the develop→master PR,
+waits for `ci / build`, and merges — one command instead of per-repo UI clicking
+(`parent` and `front` are valid service names alongside the `ms-*` ones).
+
 Failure triage: `scripts/github/fetch-failure-logs.sh` downloads the latest failing run
 logs to `/tmp/ci-logs/` (needs `GITHUB_TOKEN`).
 
