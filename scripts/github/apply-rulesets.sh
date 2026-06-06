@@ -56,17 +56,17 @@ for repo in "${REPOS[@]}"; do
       continue
     fi
     if [[ -n "$existing_id" ]]; then
-      if gh_api PUT "/repos/$OWNER/$repo/rulesets/$existing_id" "@$file" >/dev/null; then
+      if body=$(gh_api PUT "/repos/$OWNER/$repo/rulesets/$existing_id" "@$file"); then
         echo "$repo: updated ruleset '$name' (#$existing_id)"
       else
-        echo "$repo: failed to update ruleset '$name'" >&2
+        echo "$repo: failed to update ruleset '$name': $body" >&2
         FAILURES+=("$repo/$name")
       fi
     else
-      if gh_api POST "/repos/$OWNER/$repo/rulesets" "@$file" >/dev/null; then
+      if body=$(gh_api POST "/repos/$OWNER/$repo/rulesets" "@$file"); then
         echo "$repo: created ruleset '$name'"
       else
-        echo "$repo: failed to create ruleset '$name'" >&2
+        echo "$repo: failed to create ruleset '$name': $body" >&2
         FAILURES+=("$repo/$name")
       fi
     fi
