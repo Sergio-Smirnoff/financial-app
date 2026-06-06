@@ -48,7 +48,8 @@ financial-app/                          ← parent repo (this one)
 ├── docker-compose.monitoring.yml
 ├── scripts/
 │   ├── dev.sh                          ← all day-to-day orchestration
-│   └── deploy.sh
+│   ├── deploy.sh
+│   └── github/                         ← CI/CD ops: apply-rulesets, release, promote, fetch-failure-logs
 ├── infra/
 │   └── postgres/init/                  ← one-time schema bootstrap SQL
 ├── docs/

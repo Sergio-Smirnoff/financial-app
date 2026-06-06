@@ -118,6 +118,16 @@ waits for `ci / build`, and merges — one command instead of per-repo UI clicki
 Failure triage: `scripts/github/fetch-failure-logs.sh` downloads the latest failing run
 logs to `/tmp/ci-logs/` (needs `GITHUB_TOKEN`).
 
+All four scripts read `GITHUB_TOKEN` from the environment (export per session — never in
+`.env`). Fine-grained PAT scoped to the 9 repos, with:
+
+| Permission | Needed by |
+|---|---|
+| Administration: Read and write | `apply-rulesets.sh` |
+| Actions: Read and write | `release.sh`, `fetch-failure-logs.sh` |
+| Pull requests: Read and write | `promote.sh` (create PR) |
+| Contents: Read and write | `promote.sh` (merge) |
+
 Spec: `docs/superpowers/specs/2026-06-05-github-actions-ci-pipeline-design.md`
 
 ---
