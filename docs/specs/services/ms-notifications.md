@@ -62,20 +62,20 @@ ms-notifications/src/main/java/com/financialapp/notifications/
 │
 ├── infrastructure/
 │   ├── config/
-│   │   ├── KafkaConfig.java            # ByteArrayJsonMessageConverter + topic declarations
-│   │   ├── KafkaErrorHandlerConfig.java
-│   │   └── OpenApiConfig.java
+│   │   ├── KafkaConfig.java            # NewTopic declarations for the 7 inbound topics
+│   │   └── OpenApiConfig.java          # (CloudEvent consumer factory + DLQ come from commons-messaging)
 │   ├── email/SmtpEmailSender.java      # Implements EmailSender (Thymeleaf + SMTP)
 │   ├── gateway/
+│   │   ├── ProcessedEventGatewayJpaAdapter.java # ce_id dedup (commons ProcessedEventGateway port)
 │   │   └── impl/FinancesClient.java    # HTTP call to ms-finances for summaries
 │   ├── messaging/
-│   │   ├── listener/
-│   │   │   ├── BankEventListener.java       # topic: bank-alerts
-│   │   │   ├── FinancesEventListener.java   # topics: payment.due, loan.reminder, installment.reminder
-│   │   │   ├── InvestmentEventListener.java # topic: investment.threshold.reached
-│   │   │   └── UserEventListener.java       # topic: user.registered
-│   │   ├── mapper/                     # Payload → domain mappers (one per event type)
-│   │   └── payload/                    # Kafka inbound DTOs (one per event type)
+│   │   ├── listener/                   # @KafkaListener<CloudEvent> → commons IdempotentEventProcessor
+│   │   │   ├── BankEventListener.java       # banks.account.low_balance, banks.account.balance_adjusted,
+│   │   │   │                                #   banks.loan.reminder, banks.card.expiring, banks.card.installment_due
+│   │   │   ├── InvestmentEventListener.java # investments.threshold.breached
+│   │   │   └── UserEventListener.java       # users.user.registered
+│   │   ├── mapper/                     # CloudEvent data → domain mappers (one per event type)
+│   │   └── payload/                    # CloudEvent data records (one per event type)
 │   ├── persistence/
 │   │   ├── entity/
 │   │   │   ├── NotificationSqlEntity.java
@@ -159,27 +159,33 @@ erDiagram
 
 ## Kafka Consumers
 
-All listeners share **group ID** `notifications-group`. The converter is `ByteArrayJsonMessageConverter` backed by Jackson.
+All listeners consume **`CloudEvent`** values (CloudEvents 1.0 Kafka binding, **binary mode**) on **group ID** `notifications-group`. The consumer factory, `CloudEventDeserializer`, dedup and DLQ all come from the shared **`commons-messaging`** module: each handler calls `IdempotentEventProcessor.process(event, <Data>.class, handler)`, which skips already-seen `ce_id`s (`ProcessedEventGateway` → `processed_event` table) and routes the JSON `data` to the use case. On failure the record retries then lands on `<topic>.DLT`.
 
-| Listener | Topic | Payload class | Use Case |
-|----------|-------|---------------|----------|
-| `UserEventListener` | `user.registered` | `UserRegisteredEvent` | `ProcessUserRegisteredUseCase` — persists welcome notification; creates `UserNotificationPreference` if absent |
-| `FinancesEventListener` | `payment.due` | `PaymentDueEvent` | `ProcessPaymentDueUseCase` |
-| `FinancesEventListener` | `loan.reminder` | `LoanReminderEvent` | `ProcessLoanReminderUseCase` |
-| `FinancesEventListener` | `installment.reminder` | `InstallmentReminderEvent` | `ProcessInstallmentReminderUseCase` |
-| `BankEventListener` | `bank-alerts` | `BankAlertEvent` | `ProcessBankEventUseCase` — handles `CARD_EXPIRING`, `LOW_BALANCE`, `TRANSFER_SENT`, `TRANSFER_RECEIVED` |
-| `InvestmentEventListener` | `investment.threshold.reached` | `InvestmentThresholdEvent` | `ProcessInvestmentThresholdUseCase` — GAIN or LOSS direction |
+| Listener | Topic (`= ce_type`) | `data` record | Use Case |
+|----------|---------------------|---------------|----------|
+| `UserEventListener` | `users.user.registered` | `UserRegisteredData` | `ProcessUserRegisteredUseCase` — welcome notification; creates `UserNotificationPreference` if absent |
+| `BankEventListener` | `banks.account.low_balance` | `LowBalanceData` | `ProcessLowBalanceUseCase` |
+| `BankEventListener` | `banks.account.balance_adjusted` | `BalanceAdjustedData` | `ProcessBalanceAdjustedUseCase` |
+| `BankEventListener` | `banks.loan.reminder` | `LoanReminderData` | `ProcessLoanReminderUseCase` |
+| `BankEventListener` | `banks.card.expiring` | `CardExpiringData` | `ProcessCardExpiringUseCase` |
+| `BankEventListener` | `banks.card.installment_due` | `CardInstallmentDueData` | `ProcessPaymentDueUseCase` |
+| `InvestmentEventListener` | `investments.threshold.breached` | `InvestmentThresholdData` | `ProcessInvestmentThresholdUseCase` — GAIN or LOSS |
 
-### Event Payloads (key fields)
+> The old `bank-alerts` umbrella (type-string + stringified metadata) was split into the five typed `banks.*` events above. Reminders are now produced by **ms-banks** (it owns loans/cards post-DDD), not ms-finances — there is no longer a `FinancesEventListener`.
 
-| Payload | Top-level fields | Nested `Payload` fields |
-|---------|-----------------|-------------------------|
-| `UserRegisteredEvent` | `eventType`, `userId` | `email`, `firstName`, `lastName` |
-| `PaymentDueEvent` | `eventType`, `userId`, `timestamp` | `cardExpenseId`, `description`, `nextDueDate`, `installmentAmount`, `currency`, `remainingInstallments` |
-| `LoanReminderEvent` | `eventType`, `userId`, `timestamp` | `loanId`, `loanDescription`, `nextPaymentDate`, `installmentAmount`, `currency`, `remainingInstallments` |
-| `InstallmentReminderEvent` | `eventType`, `userId`, `timestamp` | `loanId`, `installmentId`, `loanDescription`, `installmentNumber`, `dueDate`, `amount`, `currency` |
-| `BankAlertEvent` | `userId`, `type`, `title`, `message`, `metadata` | — (flat) |
-| `InvestmentThresholdEvent` | `eventType`, `userId`, `timestamp` | `holdingId`, `ticker`, `name`, `direction`, `thresholdPct`, `actualPct`, `currentPrice`, `avgPurchasePrice`, `currency` |
+### Event `data` payloads (key fields)
+
+CloudEvents envelope attributes (`ce_id`, `ce_source`, `ce_type`, `ce_time`, `ce_dataschema`) travel as Kafka headers; the fields below are the JSON **`data`** (the Kafka record value).
+
+| `data` record | Fields |
+|---------------|--------|
+| `UserRegisteredData` | `userId`, `email`, `firstName`, `lastName` |
+| `LowBalanceData` | `userId`, `accountName`, `accountCbu`, `bankNumber`, `balance`, `currency` |
+| `BalanceAdjustedData` | `userId`, `accountName`, `accountCbu`, `bankNumber`, `amount`, `currency`, `credit` |
+| `LoanReminderData` | `userId`, `loanId`, `installmentId`, `installmentNumber`, `loanName`, `dueDate` |
+| `CardExpiringData` | `userId`, `cardNumber`, `bankNumber`, `expiringDate` |
+| `CardInstallmentDueData` | `userId`, `cardNumber`, `installmentId`, `installmentNumber`, `totalInstallments`, `description`, `dueDate`, `amount`, `currency` |
+| `InvestmentThresholdData` | `userId`, `holdingId`, `ticker`, `name`, `direction`, `thresholdPct`, `actualPct`, `currentPrice`, `avgPurchasePrice`, `currency` |
 
 ---
 
@@ -264,7 +270,7 @@ sequenceDiagram
     participant SSE as SseInAppNotificationSender
     participant Browser
 
-    Producer->>Kafka: publish event (e.g. payment.due)
+    Producer->>Kafka: publish CloudEvent (e.g. banks.loan.reminder)
     Kafka-->>Listener: deliver to notifications-group
     Listener->>UseCase: execute(ProcessXxxCommand)
     UseCase->>Service: createAndDispatch(Notification)

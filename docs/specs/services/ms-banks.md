@@ -14,7 +14,7 @@
 
 ## Summary
 
-ms-banks owns the user's financial instruments at the bank level: the bank catalog, bank accounts (CBU-addressed), credit/debit cards with installment schedules, and loans amortised via the French method. It provides a consolidated upcoming-payments view (combining loan and card installments) and a metadata endpoint for form selectors. Domain events are published to Kafka on balance adjustments, installment payments, and loan creation; the service also consumes `transaction.created` events from ms-finances to keep account balances in sync.
+ms-banks owns the user's financial instruments at the bank level: the bank catalog, bank accounts (CBU-addressed), credit/debit cards with installment schedules, and loans amortised via the French method. It provides a consolidated upcoming-payments view (combining loan and card installments) and a metadata endpoint for form selectors. Domain events are published via a transactional **outbox** (CloudEvents, binary mode) on balance adjustments, low balance, installment payments, and the daily card/loan alerts; the service also consumes `finances.transaction.created` events from ms-finances to keep account balances in sync.
 
 ---
 
@@ -194,7 +194,7 @@ sequenceDiagram
         Client->>AccountController: POST /api/v1/banks/accounts/{cbu}/balance/adjust?delta=...&currency=...
         AccountController->>AdjustBalanceUseCase: execute(AdjustBalanceCommand)
     else Kafka — transaction sync
-        Kafka-->>TransactionEventListener: transaction.created event
+        Kafka-->>TransactionEventListener: finances.transaction.created event
         TransactionEventListener->>AdjustBalanceUseCase: execute(AdjustBalanceCommand)
         note over TransactionEventListener: idempotency via ProcessedEvent table
     end
@@ -206,7 +206,7 @@ sequenceDiagram
     note over Account: Raises BalanceAdjustedEvent;<br/>LowBalanceEvent if balance < 500
     AdjustBalanceUseCase->>AccountRepository: save(updatedAccount)
     AdjustBalanceUseCase->>DomainEventPublisher: publishAll(events)
-    DomainEventPublisher-->>Kafka: balance.adjusted / low.balance (AFTER_COMMIT)
+    DomainEventPublisher-->>Kafka: banks.account.balance_adjusted / banks.account.low_balance (via outbox relay)
 ```
 
 ---
@@ -279,17 +279,19 @@ sequenceDiagram
 
 ## Kafka Integration
 
+CloudEvents 1.0 (Kafka binding, **binary mode**) via the shared `commons-messaging` module. Outbound events are written to the `outbox_event` table in the **same DB transaction** and published by the commons `OutboxRelay` (`@Scheduled`); inbound events are deduped on `ce_id` (`processed_event` table) by `IdempotentEventProcessor`. Topic name `= ce_type`.
+
 | Direction | Topic | Trigger |
 |-----------|-------|---------|
-| Consumes | `transaction.created` | ms-finances publishes when a transaction is recorded; ms-banks adjusts account balance (idempotent via `processed_events` table) |
-| Publishes | `balance.adjusted` | After every successful credit or debit |
-| Publishes | `low.balance` | When post-adjustment balance falls below 500 (account's own currency) |
-| Publishes | `loan.created` (via `LoanCreatedEvent`) | After loan origination |
-| Publishes | `loan.installment.paid` | After paying a loan installment |
-| Publishes | `card.installment.paid` | After paying a card installment |
-| Publishes (alert) | `bank.alert` | Daily scheduler at 08:00: card expiries (30-day window), upcoming loan/card payments (3-day window), low-balance accounts |
+| Consumes | `finances.transaction.created` | ms-finances records a transaction; ms-banks adjusts the addressed account's balance (idempotent via `processed_events`) |
+| Publishes → ms-finances | `banks.payment.recorded` | After a loan or card installment is paid — records the cash leg in ms-finances |
+| Publishes → ms-notifications | `banks.account.balance_adjusted` | After every successful credit or debit |
+| Publishes → ms-notifications | `banks.account.low_balance` | When post-adjustment balance falls below 500 (account's own currency) |
+| Publishes → ms-notifications | `banks.loan.reminder` | Daily scheduler — loan installments due ≤3 days |
+| Publishes → ms-notifications | `banks.card.expiring` | Daily scheduler — cards expiring ≤30 days |
+| Publishes → ms-notifications | `banks.card.installment_due` | Daily scheduler — card installments due ≤3 days |
 
-All publishes happen `AFTER_COMMIT` via `TransactionalKafkaListener` to prevent phantom events on rollback.
+Delivery is at-least-once via the outbox + relay (no `AFTER_COMMIT`/`TransactionalKafkaListener`); consumers dedup on `ce_id`, and a failed consume retries then lands on `<topic>.DLT`.
 
 ---
 
@@ -297,7 +299,7 @@ All publishes happen `AFTER_COMMIT` via `TransactionalKafkaListener` to prevent 
 
 | Job | Schedule | Action |
 |-----|----------|--------|
-| `BankAlertScheduler.runDailyAlerts()` | `0 0 8 * * *` (daily 08:00) | Checks card expirations (≤30 days), upcoming loan installments (≤3 days), upcoming card installments (≤3 days), low-balance accounts (< 500) — publishes `bank.alert` events to Kafka |
+| `BankAlertScheduler.runDailyAlerts()` | `0 0 8 * * *` (daily 08:00) | Checks card expirations (≤30 days), upcoming loan installments (≤3 days), upcoming card installments (≤3 days), low-balance accounts (< 500) — writes `banks.card.expiring` / `banks.loan.reminder` / `banks.card.installment_due` / `banks.account.low_balance` events to the outbox. On serialization/outbox failure it logs the stack trace and rethrows so the `@Transactional` run rolls back. |
 
 ---
 
@@ -371,16 +373,18 @@ back/ms-banks/src/main/java/com/financialapp/banks/
     │   ├── entity/                 (AccountJpaEntity, BankJpaEntity,
     │   │                            CardJpaEntity, CardInstallmentJpaEntity,
     │   │                            LoanJpaEntity, LoanInstallmentJpaEntity,
-    │   │                            ProcessedEventJpaEntity)
+    │   │                            OutboxEventEntity)
     │   ├── jpa/                    (Spring Data JPA repositories)
     │   ├── mapper/                 (JPA ↔ domain mappers)
     │   ├── repository/             (domain port implementations)
     │   ├── query/                  (read-model / projection queries)
     │   └── seed/                   (BankCatalogSeeder)
     ├── messaging/
-    │   ├── KafkaDomainEventPublisher
-    │   ├── listener/               (TransactionEventListener, TransactionalKafkaListener)
-    │   ├── payload/                (TransactionCreatedEvent, BankAlertEvent, …)
+    │   ├── KafkaDomainEventPublisher   (DomainEventPublisher → writes outbox records)
+    │   ├── listener/               (TransactionEventListener)
+    │   ├── payload/                (CloudEvent data records: TransactionCreatedData,
+    │   │                            PaymentRecordedData, LowBalanceData, BalanceAdjustedData,
+    │   │                            LoanReminderData, CardExpiringData, CardInstallmentDueData)
     │   └── mapper/
     ├── client/                     (FinancesFeignClient, InvestmentsFeignClient)
     │   └── adapter/                (FinancesClientAdapter, InvestmentsClientAdapter)

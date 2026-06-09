@@ -104,7 +104,7 @@ sequenceDiagram
     participant R as TransactionRepository
     participant OB as OutboxEventJpaRepository
     participant REL as OutboxRelay
-    participant K as Kafka (transaction.created)
+    participant K as Kafka (finances.transaction.created)
 
     C->>UC: execute(RecordTransactionCommand)
     UC->>UC: validate ownership via AccountOwnershipGateway
@@ -118,7 +118,7 @@ sequenceDiagram
 
     loop every 2 s (configurable)
         REL->>OB: findBySentFalseOrderByIdAsc(batch)
-        REL->>K: send(topic=transaction.created, key=aggregateKey, payload)
+        REL->>K: send(topic=finances.transaction.created, key=aggregateKey, payload)
         REL->>OB: mark sent=true, sentAt=now
     end
 ```
@@ -182,8 +182,8 @@ constructor and is the sole representation of a date window.
 
 | Event | Topic | Trigger | Payload summary |
 |---|---|---|---|
-| `TransactionCreated` | `transaction.created` | New transaction recorded | `transactionId` (outbox row id), `accountCbu`, `amount` (signed), `currency` |
-| `TransactionReversed` | `transaction.created` | Transaction deleted | Same shape; negated `amount` — ms-banks credits/debits in reverse |
+| `TransactionCreated` | `finances.transaction.created` | New transaction recorded | `transactionId` (outbox row id), `accountCbu`, `amount` (signed), `currency` |
+| `TransactionReversed` | `finances.transaction.created` | Transaction deleted | Same shape; negated `amount` — ms-banks credits/debits in reverse |
 
 Both event types share the `TransactionCreatedEvent` wire record. `transactionId` is the outbox
 row id (not the transaction PK) so transfers produce two distinct idempotency keys.

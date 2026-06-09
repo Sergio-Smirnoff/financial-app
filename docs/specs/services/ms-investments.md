@@ -206,7 +206,7 @@ sequenceDiagram
 Each `Holding` carries a `ThresholdConfig` (`gainPct`, `lossPct`). After every scheduled price refresh, `EvaluateThresholdsUseCase` computes the current P&L % for every holding that has at least one threshold set (partial index `idx_holdings_notify` makes this efficient).
 
 When a threshold is breached:
-1. `KafkaDomainEventPublisher` emits `PriceThresholdBreachedEvent` (topic driven by Kafka config).
+1. `KafkaDomainEventPublisher` maps `PriceThresholdBreachedEvent` to an `OutboxRecord` on topic **`investments.threshold.breached`** (`data` = `InvestmentThresholdData`) and writes it to the `outbox_event` table in the same DB transaction; the commons `OutboxRelay` publishes it as a CloudEvent (1.0, binary mode) consumed by ms-notifications. ms-investments is **producer-only** (no consumers).
 2. The corresponding `NotificationTimestamps` field (`lastGainNotifiedAt` / `lastLossNotifiedAt`) is stamped on the `Holding` to prevent re-notification.
 3. The frontend `HoldingDetailDialog` reads these timestamps and the current `plPercent` client-side to show breach status.
 
@@ -220,7 +220,7 @@ INVESTMENT accounts in ms-banks throw `AccountInvestmentRestrictionException` on
 
 ```
 fundingCbu (owned) → brokerSentinelCbu(currency) [unowned]
-ms-finances persists tx → emits transaction.created (Kafka)
+ms-finances persists tx → emits finances.transaction.created (CloudEvent)
 ms-banks debits fundingCbu (sentinel unowned → no credit)
 investment account untouched
 ```
@@ -229,7 +229,7 @@ investment account untouched
 
 ```
 brokerSentinelCbu(currency) [unowned] → destinationCbu (owned)
-ms-finances persists tx → emits transaction.created (Kafka)
+ms-finances persists tx → emits finances.transaction.created (CloudEvent)
 ms-banks credits destinationCbu (sentinel unowned → no debit)
 ```
 
@@ -250,7 +250,7 @@ sequenceDiagram
     FIN-->>INV: 201 TransactionResponse
     INV->>INV: persist Holding
     INV-->>FE: 201 HoldingResponse
-    FIN--)KFK: transaction.created
+    FIN--)KFK: finances.transaction.created
     KFK--)BNK: debit fundingCbu
     Note over BNK: brokerSentinel unowned → no credit<br/>investment account never touched
 ```
@@ -442,11 +442,9 @@ back/ms-investments/src/main/java/com/financialapp/investments/
 │   │   ├── dto/  (FinancesApiResponse, IolHistoricalPricePoint, IolMarketQuote, IolPriceDetail, RecordTransactionRequest)
 │   │   └── impl/ (FinancesGatewayImpl, IolGatewayImpl)
 │   ├── messaging/
-│   │   ├── KafkaDomainEventPublisher.java
-│   │   ├── TransactionalKafkaEvent.java
-│   │   ├── TransactionalKafkaListener.java
-│   │   └── mapper/  (InvestmentKafkaMapper)
-│   │   └── payload/ (InvestmentThresholdPayload)
+│   │   ├── KafkaDomainEventPublisher.java       # DomainEventPublisher → writes outbox records
+│   │   ├── mapper/  (InvestmentThresholdEventMapper — DomainEventMapper → OutboxRecord)
+│   │   └── payload/ (InvestmentThresholdData — CloudEvent data record)
 │   ├── persistence/
 │   │   ├── entity/  (AssetPriceHistoryJpaEntity, AssetPriceJpaEntity, HoldingJpaEntity, MarketPanelQuoteJpaEntity, PortfolioSnapshotJpaEntity, RefreshJobJpaEntity)
 │   │   ├── jpa/     (Spring Data repositories)
