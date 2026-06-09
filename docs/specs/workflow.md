@@ -98,7 +98,7 @@ repo holds thin callers referencing them `@master`.
 Triggers per service repo:
 - `ci.yml`: every PR + push to develop/master → status check `ci / build`
 - `docker-publish.yml`: push to master or `v*` tag
-- `release.yml`: manual (Actions tab dropdown) or `scripts/github/release.sh <bump> <service...|all>`
+- `release.yml`: manual (Actions tab dropdown) or `scripts/github/release-manager.sh` (`release`)
 
 Branch rulesets (applied via `scripts/github/apply-rulesets.sh`, JSON in `.github/rulesets/`):
 - `master`: PR required, `ci / build` check required, no force-push/delete
@@ -111,7 +111,7 @@ Release flow: merge develop→master via PR → trigger Release with bump type
 (major/minor/patch) → image published as `X.Y.Z` + `X.Y` + `latest` + `sha-*`.
 The caller `release.yml` only runs from `master` (`if: github.ref == 'refs/heads/master'`).
 
-Promotion: `scripts/github/promote.sh <service...|all>` creates the develop→master PR,
+Promotion: `scripts/github/release-manager.sh` (`promote`) creates the develop→master PR,
 waits for `ci / build`, and merges — one command instead of per-repo UI clicking
 (`parent` and `front` are valid service names alongside the `ms-*` ones).
 
@@ -124,9 +124,9 @@ All four scripts read `GITHUB_TOKEN` from the environment (export per session �
 | Permission | Needed by |
 |---|---|
 | Administration: Read and write | `apply-rulesets.sh` |
-| Actions: Read and write | `release.sh`, `fetch-failure-logs.sh` |
-| Pull requests: Read and write | `promote.sh` (create PR) |
-| Contents: Read and write | `promote.sh` (merge) |
+| Actions: Read and write | `release-manager.sh` (`release`), `fetch-failure-logs.sh`, `read-ci-failures.sh` |
+| Pull requests: Read and write | `release-manager.sh` (`promote` — create PR) |
+| Contents: Read and write | `release-manager.sh` (`promote` — merge) |
 
 Spec: `docs/superpowers/specs/2026-06-05-github-actions-ci-pipeline-design.md`
 

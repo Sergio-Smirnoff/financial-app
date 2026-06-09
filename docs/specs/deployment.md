@@ -150,14 +150,14 @@ Images are published to GitHub Container Registry (`ghcr.io/sergio-smirnoff/<ser
 | Event | Tags applied |
 |---|---|
 | Push to `master` | `latest`, `sha-<shortsha>` |
-| `v*` tag (from `release.yml` or `scripts/github/release.sh`) | `X.Y.Z`, `X.Y`, `latest`, `sha-<shortsha>` |
+| `v*` tag (from `release.yml` or `scripts/github/release-manager.sh`) | `X.Y.Z`, `X.Y`, `latest`, `sha-<shortsha>` |
 
 **Releasing a service:**
 - Via Actions UI: go to the service repo → Actions → `release.yml` → Run workflow → pick bump type
   (`major` / `minor` / `patch`). The caller enforces a `master`-only guard.
-- Via CLI: `scripts/github/release.sh <bump> <service...|all>` — wraps the API trigger.
+- Via CLI: `scripts/github/release-manager.sh` (`release`) — interactive, dispatches the API trigger in parallel.
 
-`scripts/github/promote.sh <service...|all>` handles the develop→master PR + wait + merge before a release.
+`scripts/github/release-manager.sh` (`promote`) handles the develop→master PR + wait + merge before a release — parent first (blocking), then services in parallel.
 
 **Version pinning on the server:** every app service in `docker-compose.yml` reads its image
 tag from `.env` — `GATEWAY_VERSION`, `USERS_VERSION`, `FINANCES_VERSION`, `BANKS_VERSION`,
