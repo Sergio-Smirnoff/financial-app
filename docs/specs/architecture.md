@@ -41,6 +41,9 @@ graph TD
 | :-- | :-- | :-- |
 | `commons-core` | `ApiResponse` envelope `{status, title, code, message, data}`, `ErrorCategory`, `ErrorCode` interface, `DomainException` base | all 7 services (framework-free except `HttpStatus`/Jackson — safe in domain layers) |
 | `commons-web` | `ApiExceptionHandler` base advice, static `ErrorCategoryHttpMapper`, `CommonErrorCode`, `@ApiErrorCodes` + Swagger error-example generation, OpenAPI auto-config | the 6 servlet services (ms-gateway is WebFlux → commons-core only) |
+| `commons-messaging` | CloudEvents Kafka plumbing — `OutboxGateway`/`ProcessedEventGateway`/`DomainEventMapper` ports, `OutboxRecord`/`EventType`/`CeAttributes` VOs, `OutboxRelay`, `IdempotentEventProcessor`, `CloudEventSerde`, `CeHeaders`, `StandardDlqErrorHandler` | the event-driven services (producers + consumers) |
+
+**Structural convention.** The shared modules follow the **same DDD layering as the services** — `domain/` (ports under `domain/gateway/`, value objects under `domain/model/`) and `infrastructure/` (framework/SDK adapters) — including *only the layers that genuinely apply* to a library (no `web/` or `application/`, since a shared module has no controllers or business workflows). Concretely, `commons-messaging` keeps the `io.cloudevents` SDK confined to `infrastructure/` and exposes only `domain/gateway` ports to consumers (DIP); gateway implementations that own a database table live in each service's own `infrastructure/gateway/`. `commons-core`/`commons-web` are framework-light building-block modules and stay at their current granularity. Rationale: a shared library is a cross-cutting technical concern, not a bounded context, so it is layered the same way a service is but is never forced to carry empty layers.
 
 Services MUST build `financial-app-parent` (`mvn install`) before their own build — `dev.sh` and every service Dockerfile do this automatically.
 
@@ -169,7 +172,7 @@ Every PR and push to `develop`/`master` triggers the `ci / build` status check (
 Branch rulesets on all nine repos enforce this check as required on `master` — merging requires a
 passing PR. Docker images are published to GHCR on every `master` push (`latest` + `sha-<shortsha>`)
 and on every `v*` tag (`X.Y.Z` + `X.Y` + `latest` + `sha-<shortsha>`). Releases are cut via the
-per-repo `release.yml` Actions dropdown or `scripts/github/release.sh`.
+per-repo `release.yml` Actions dropdown or `scripts/github/release-manager.sh` (`release`).
 
 See [workflow.md](workflow.md) § CI/CD for the full workflow table, ruleset details, scripts, and
 required PAT permissions.

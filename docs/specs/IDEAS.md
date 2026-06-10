@@ -16,7 +16,7 @@ it's ready to build.
 
 ### Features
 - Add the thesis to the investments
-- 
+- Add to workflow the use of Notion insead of this Ideas.md, to manage task / features / histories to be done. With this we can track progress, backlog and status of the project
 
 ### Improvements & refactors
 - Change all the JWT system and the auth tokens

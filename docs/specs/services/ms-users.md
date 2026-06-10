@@ -3,7 +3,7 @@
 **Port:** 8081  
 **DB schema:** `users`  
 **Framework:** Spring MVC + Spring Security (stateless)  
-**Kafka:** publishes `user.registered` on successful registration
+**Kafka:** publishes `users.user.registered` (CloudEvents 1.0, binary mode) via a transactional outbox on successful registration
 
 ---
 
@@ -60,10 +60,9 @@ back/ms-users/src/main/java/com/financialapp/users/
 │   │   ├── AuthenticationProviderGatewayImpl.java
 │   │   └── PasswordHashGatewayImpl.java
 │   ├── messaging/
-│   │   ├── DomainEventPublisherImpl.java
-│   │   ├── TransactionalKafkaEvent.java
-│   │   ├── TransactionalKafkaListener.java
-│   │   └── payload/
+│   │   ├── DomainEventPublisherImpl.java   # routes domain events to the outbox
+│   │   ├── mapper/UserRegisteredEventMapper.java  # DomainEventMapper → OutboxRecord
+│   │   └── payload/                         # CloudEvent data records
 │   │       └── UserRegisteredPayload.java
 │   └── persistence/
 │       ├── entity/
@@ -248,7 +247,7 @@ sequenceDiagram
     ms-users->>ms-users: BCrypt.hash(password)
     ms-users->>PostgreSQL: INSERT INTO users.users
     PostgreSQL-->>ms-users: saved User (id assigned)
-    ms-users->>Kafka: publish UserRegisteredEvent → topic user.registered
+    ms-users->>Kafka: users.user.registered (CloudEvent, via outbox relay)
     ms-users->>ms-users: sign access + refresh JWTs
     ms-users-->>Browser: 201 Created + 3 cookies + AuthResponse
 ```

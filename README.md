@@ -157,8 +157,8 @@ The gateway aggregates all per-service Swagger docs at a single URL — use `:80
 
 Reusable GitHub Actions workflows for all service repos live in `.github/workflows/`.
 Branch rulesets in `.github/rulesets/` (apply with `scripts/github/apply-rulesets.sh`).
-Multi-repo releases: `scripts/github/release.sh <major|minor|patch> <service...|all>`.
-develop→master promotions: `scripts/github/promote.sh <service...|all>` (PR + wait + merge).
+Promote + release (interactive, parallel, parent-first): `scripts/github/release-manager.sh`
+(`promote` = develop→master PR + wait + merge; `release` = dispatch vX.Y.Z). Run with no args for the menu.
 Failing-run logs: `scripts/github/fetch-failure-logs.sh` (downloads to `/tmp/ci-logs/`).
 See `docs/specs/workflow.md` § CI/CD.
 
