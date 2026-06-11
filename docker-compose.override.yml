@@ -1,25 +1,25 @@
 # =============================================================================
-# docker-compose.override.yml — Development overrides
+# docker-compose.override.yml — DEVELOPMENT overlay (auto-loaded)
 # =============================================================================
-# Docker Compose loads this file automatically alongside docker-compose.yml.
-# Exposes microservice and infrastructure ports to the host for local development.
-# In production, this file should NOT be used (e.g., using `docker compose -f docker-compose.yml up -d`).
+# Docker Compose loads this automatically with the default `docker compose` cmd.
+# It ONLY publishes host ports for local development.
 #
-# Swagger UIs (only available in development):
-#   Users service        → http://localhost:8081/swagger-ui.html
-#   Finances service     → http://localhost:8082/swagger-ui.html
-#   Cards service        → http://localhost:8083/swagger-ui.html
-#   Notifications svc    → http://localhost:8084/swagger-ui.html
-#   Upload service       → http://localhost:8085/swagger-ui.html
+# PRODUCTION must bypass this file by passing -f explicitly:
+#   docker compose -f docker-compose.yml --profile app up -d
 #
-# Production: docker compose -f docker-compose.yml --profile app up -d
+# Dev (ports exposed):
+#   docker compose --profile app up -d
+#
+# Swagger UIs (dev, direct to each service):
+#   Users 8081 · Finances 8082 · Banks 8083 · Notifications 8084 ·
+#   Upload 8085 · Investments 8086  →  http://localhost:<port>/swagger-ui.html
+# Monitoring (dev): Prometheus 9090 · Grafana 3001 · Loki 3100
 # =============================================================================
 
 services:
-  # ─── Infrastructure ───────────────────────────────────────────────────────────
   traefik:
     ports:
-      - "8888:8080" # Traefik dashboard
+      - "8888:8080"
 
   postgres:
     ports:
@@ -34,7 +34,6 @@ services:
       - "9000:9000"
       - "9001:9001"
 
-  # ─── Application services ─────────────────────────────────────────────────────
   gateway:
     ports:
       - "8080:8080"
@@ -44,25 +43,37 @@ services:
       - "3000:3000"
 
   service-users:
-    # ports:
-    #   - "8081:8081"
+    ports:
+      - "8081:8081"
 
   service-finances:
-    # ports:
-    #   - "8082:8082"
+    ports:
+      - "8082:8082"
 
   service-banks:
-    # ports:
-    #   - "8083:8083"
+    ports:
+      - "8083:8083"
 
   service-notifications:
-    # ports:
-    #   - "8084:8084"
+    ports:
+      - "8084:8084"
 
   service-upload:
-    # ports:
-    #   - "8085:8085"
+    ports:
+      - "8085:8085"
 
   service-investments:
-    # ports:
-    #   - "8086:8086"
+    ports:
+      - "8086:8086"
+
+  prometheus:
+    ports:
+      - "9090:9090"
+
+  grafana:
+    ports:
+      - "3001:3000"
+
+  loki:
+    ports:
+      - "3100:3100"

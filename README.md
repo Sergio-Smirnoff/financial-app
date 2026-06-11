@@ -42,10 +42,8 @@ graph TD
 ```
 financial-app/                          ← parent repo (this one)
 ├── .env.example                        ← canonical env-var reference
-├── docker-compose.yml
-├── docker-compose.override.yml
-├── docker-compose.local.yml
-├── docker-compose.monitoring.yml
+├── docker-compose.yml                  ← canonical PRODUCTION stack (+ always-on monitoring)
+├── docker-compose.override.yml         ← dev-only host-port overlay (auto-loaded)
 ├── scripts/
 │   ├── dev.sh                          ← all day-to-day orchestration
 │   ├── deploy.sh
@@ -150,6 +148,33 @@ That command starts PostgreSQL, Kafka, MinIO, all backend services (Maven hot-re
 | frontend | 3000 | http://localhost:3000 |
 
 The gateway aggregates all per-service Swagger docs at a single URL — use `:8080/swagger-ui.html` when all services are running.
+
+---
+
+## Production launch (single VM)
+
+Monitoring (Prometheus/Grafana/Loki/Promtail) is part of the stack and starts automatically.
+
+```bash
+# 1. Fill in .env (copy from .env.example), including:
+#    KAFKA_CLUSTER_ID, GRAFANA_ADMIN_PASSWORD, SWAGGER_AUTH
+# 2. Launch the whole stack (explicit -f bypasses the dev override):
+docker compose -f docker-compose.yml --profile app up -d
+```
+
+Externally reachable:
+- App:      `https://${DOMAIN_NAME}`
+- API:      `https://${DOMAIN_NAME}/api`
+- Swagger:  `https://${DOMAIN_NAME}/swagger-ui.html` (HTTP basic-auth via `SWAGGER_AUTH`)
+- Grafana:  `https://${DOMAIN_NAME}/grafana` (login via `GRAFANA_ADMIN_PASSWORD`)
+
+Internal-only (no host ports in prod): Postgres, Kafka, MinIO, Prometheus, Loki.
+
+Dev mode (exposes per-service host ports 8081–8086, plus 9090/3001/3100):
+
+```bash
+docker compose --profile app up -d
+```
 
 ---
 

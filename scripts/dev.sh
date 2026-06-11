@@ -67,7 +67,7 @@ check_env() {
 }
 
 # ─── Infrastructure services ──────────────────────────────────────────────────
-INFRA_SERVICES="postgres zookeeper kafka minio"
+INFRA_SERVICES="postgres kafka minio"
 
 # ─── Monitoring services ──────────────────────────────────────────────────────
 MONITOR_SERVICES="prometheus grafana loki promtail"
@@ -102,7 +102,7 @@ cmd_monitor() {
     header "Starting monitoring stack"
     check_docker
     check_env
-    docker compose -f docker-compose.monitoring.yml up -d
+    docker compose up -d prometheus grafana loki promtail
     echo ""
     success "Monitoring stack running:"
     echo "  prometheus → http://localhost:9090"
@@ -295,7 +295,6 @@ cmd_down() {
     header "Stopping all services"
     check_docker
     docker compose --profile app down
-    docker compose -f docker-compose.monitoring.yml down
     success "All containers stopped."
 }
 
@@ -343,9 +342,6 @@ cmd_status() {
     check_docker
     header "Container status"
     docker compose --profile app ps
-    echo ""
-    header "Monitoring status"
-    docker compose -f docker-compose.monitoring.yml ps
 }
 
 # =============================================================================
