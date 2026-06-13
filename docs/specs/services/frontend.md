@@ -248,6 +248,18 @@ Modal names: `create-transaction`, `edit-transaction`, `create-category`, `creat
 
 ---
 
+## Recent UX Fixes (2026-06-12)
+
+| Area | Fix |
+|---|---|
+| Investments — Markets tab | Ticker research now renders inline below `TickerSearchBox` via an `onSelect` callback; the dedicated `/investments/research/[ticker]` route was removed. |
+| Transactions table | Sentinel CBUs render labelled operation names: `Brokerage` for broker sentinel CBUs and `External` for the `0000000000000000000000` installment sentinel; user CBUs render raw as before. |
+| `PriceChart` | Non-positive price points are filtered out before rendering, eliminating the drop-to-zero spike caused by pre-open / no-trade IOL candles. |
+| Card list | Card item layout fixed so the Expires / behavior row is no longer clipped. |
+| Notifications dialog | Close button repositioned so it no longer overlaps the "Mark all as read" control. |
+
+---
+
 ## Notifications (SSE)
 
 `useNotificationSSE` opens an `EventSource` to `{GATEWAY_URL}/api/v1/notifications/stream` with `withCredentials: true`. Auth is carried by the `access_token` HttpOnly cookie. On each `notification` event it fires a `sonner` toast and invalidates the `['notifications']` query key. On error it closes and reconnects after 5 s. The hook is mounted exclusively by `NotificationProvider`, which wraps the entire `(dashboard)` layout.

@@ -136,6 +136,8 @@ erDiagram
 
 Fields extracted: `ultimoPrecio`, `apertura`, `maximo`, `minimo`, `volumen`/`volumenNominal`, `variacion`, `fechaHora`.
 
+`IolGatewayImpl.getHistoricalSeries` filters out any returned point whose `lastPrice` is null or ≤ 0 before persisting history. This removes no-trade sessions and pre-open candles (which IOL returns with a zero price), preventing the trailing drop-to-zero spike on price charts.
+
 ---
 
 ## Scheduled Price Refresh — Sequence Diagram

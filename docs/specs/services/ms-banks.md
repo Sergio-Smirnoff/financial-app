@@ -255,6 +255,8 @@ sequenceDiagram
 
 ### LoanController — `/api/v1/banks/loans`
 
+**Security fix (2026-06-12):** `LoanRepository.findByBankNumberAndUserId(BankNumber, UserId)` replaced the removed `findByBankNumber(BankNumber)`. The previous unscoped query returned every user's loans for that bank when a `?bankNumber=` filter was applied; the fix enforces user isolation at the repository level.
+
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/api/v1/banks/loans` | List user loans; optional `?bankNumber=` filter |
