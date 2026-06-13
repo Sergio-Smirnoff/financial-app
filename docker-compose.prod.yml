@@ -1,0 +1,19 @@
+# docker-compose.prod.yml — pinned production image tags.
+# Use WITH the base file: docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile app ...
+services:
+  gateway:
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-gateway:1.1.0
+  service-users:
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-users:1.1.0
+  service-finances:
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-finances:1.1.0
+  service-banks:
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-banks:1.1.0
+  service-notifications:
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-notifications:1.1.0
+  service-upload:
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-upload:0.2.0
+  service-investments:
+    image: ghcr.io/sergio-smirnoff/financial-app-back-ms-investments:1.1.0
+  frontend:
+    image: ghcr.io/sergio-smirnoff/financial-app-front-financial-app:1.1.0
