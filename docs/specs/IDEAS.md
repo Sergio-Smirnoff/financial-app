@@ -18,72 +18,20 @@ it's ready to build.
 - Add the thesis to the investments
 - Add to workflow the use of Notion insead of this Ideas.md, to manage task / features / histories to be done. With this we can track progress, backlog and status of the project
 - grafana dashboards and alerts
+- Add csv download for history and holdings
 
 ### Bugs
-- Cant create an account with the same name although its a different user, that does not need to be a restriction
-- In historic transactions: The table column type, the color of the INCOME pill is not green
-- Error in creation of card: - Could be fix with a review of the envelops in all the front -
-  POST http://localhost:8080/api/v1/banks/cards 400 (Bad Request)
-  apiFetch @ client.ts:39
-  (anonymous) @ client.ts:80
-  (anonymous) @ cards.ts:14
-  (anonymous) @ useCards.ts:24
-  (anonymous) @ mutation.ts:190
-  (anonymous) @ retryer.ts:155
-  (anonymous) @ retryer.ts:221
-  execute @ mutation.ts:235
-  await in execute
-  mutate @ mutationObserver.ts:142
-  (anonymous) @ CardFormDialog.tsx:79
-  (anonymous) @ createFormControl.ts:1311
-  await in (anonymous)
-  executeDispatch @ react-dom-client.development.js:16970
-  runWithFiberInDEV @ react-dom-client.development.js:871
-  processDispatchQueue @ react-dom-client.development.js:17020
-  (anonymous) @ react-dom-client.development.js:17621
-  batchedUpdates$1 @ react-dom-client.development.js:3311
-  dispatchEventForPluginEventSystem @ react-dom-client.development.js:17174
-  dispatchEvent @ react-dom-client.development.js:21357
-  dispatchDiscreteEvent @ react-dom-client.development.js:21325
-  CardFormDialog.tsx:83 Failed to submit card form: ApiError: Card number must be exactly 16 digits
-      at apiFetch (client.ts:71:11)
-  Not showing an error in the card, not catched
 
-- In the principal dashbaord, the Income vs expense is just showing 1 currency data with the label USD. Which is not true
-- Cant create 2 investment accounts in a bank, show be allowed 1 investment account per currency per bank per user. 
-POST http://localhost:8080/api/v1/banks/cards 400 (Bad Request)
-apiFetch @ client.ts:39
-(anonymous) @ client.ts:80
-(anonymous) @ cards.ts:14
-(anonymous) @ useCards.ts:24
-(anonymous) @ mutation.ts:190
-(anonymous) @ retryer.ts:155
-(anonymous) @ retryer.ts:221
-execute @ mutation.ts:235
-await in execute
-mutate @ mutationObserver.ts:142
-(anonymous) @ CardFormDialog.tsx:79
-(anonymous) @ createFormControl.ts:1311
-await in (anonymous)
-executeDispatch @ react-dom-client.development.js:16970
-runWithFiberInDEV @ react-dom-client.development.js:871
-processDispatchQueue @ react-dom-client.development.js:17020
-(anonymous) @ react-dom-client.development.js:17621
-batchedUpdates$1 @ react-dom-client.development.js:3311
-dispatchEventForPluginEventSystem @ react-dom-client.development.js:17174
-dispatchEvent @ react-dom-client.development.js:21357
-dispatchDiscreteEvent @ react-dom-client.development.js:21325
-CardFormDialog.tsx:83 Failed to submit card form: ApiError: Card number must be exactly 16 digits
-    at apiFetch (client.ts:71:11)
-
-- Cant make a transfer to an investment account
-- The edit holding is broken, Investment account cannot be set there![alt text](image.png)
-
+All previously-listed bugs (investments search/tabs/chart/empty-state, account 409 surfacing,
+small-width account UI, balance-delay disclaimer, empty account selectors, IOL currency, ICBC
+card check-digit, sentinel-CBU naming) were fixed 2026-06-12. See
+[2026-06-12-bugfix-batch-investments-cards-iol.md](2026-06-12-bugfix-batch-investments-cards-iol.md).
 
 ### Improvements & refactors
 - Change all the JWT system and the auth tokens
 - Add or reincert kafka topics, specific for each emmision and notification track all that. Fix the kafka headers 
 - refactor some pages of the front end: banks, investments, categories, configuration, uploads
+- Look for @Disable in tests
 
 ### Infrastructure & tooling
 - review network
