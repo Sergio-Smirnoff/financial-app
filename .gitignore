@@ -52,8 +52,6 @@ back/ms-upload/
 back/ms-investments/
 front/financial-app/
 
-/docs/resources/
-
 # Custom
 git-manager.sh
 .dev-pids
@@ -63,3 +61,6 @@ CLAUDE.md
 .worktrees/
 .aider*
 .claude/
+
+# Superpowers brainstorm visual companion (mockups, transient)
+.superpowers/

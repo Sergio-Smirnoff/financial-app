@@ -22,15 +22,10 @@ it's ready to build.
 
 ### Bugs
 
-All previously-listed bugs (investments search/tabs/chart/empty-state, account 409 surfacing,
-small-width account UI, balance-delay disclaimer, empty account selectors, IOL currency, ICBC
-card check-digit, sentinel-CBU naming) were fixed 2026-06-12. See
-[2026-06-12-bugfix-batch-investments-cards-iol.md](2026-06-12-bugfix-batch-investments-cards-iol.md).
 
 ### Improvements & refactors
 - Change all the JWT system and the auth tokens
-- Add or reincert kafka topics, specific for each emmision and notification track all that. Fix the kafka headers 
-- refactor some pages of the front end: banks, investments, categories, configuration, uploads
+- refactor some pages of the front end: categories, configuration, uploads
 - Look for @Disable in tests
 
 ### Infrastructure & tooling
@@ -57,7 +52,6 @@ card check-digit, sentinel-CBU naming) were fixed 2026-06-12. See
 
 - Host the application on the cloud → researched, spec: [2026-06-05-cloud-hosting-research.md](../superpowers/specs/2026-06-05-cloud-hosting-research.md)
 - Java 25 migration → researched, decision: Boot 4.0 + SC 2025.1 + Java 25, spec: [2026-06-05-java-25-spring-boot-4-migration.md](../superpowers/specs/2026-06-05-java-25-spring-boot-4-migration.md)
-- GitHub Actions CI pipeline + branch protections → IMPLEMENTED 2026-06-05, spec: [2026-06-05-github-actions-ci-pipeline-design.md](../superpowers/specs/2026-06-05-github-actions-ci-pipeline-design.md)
 
 ---
 
