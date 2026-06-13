@@ -35,7 +35,7 @@ ms-banks owns the user's financial instruments at the bank level: the bank catal
 
 | Enum | Values |
 |------|--------|
-| `AccountType` | `CHECKING`, `SAVINGS`, `INVESTMENT` |
+| `AccountType` | `CHECKING`, `SAVINGS` |
 | `CardBrand` | `VISA`, `MASTERCARD`, `AMEX` |
 | `CardType` | `STANDARD`, `SILVER`, `GOLD`, `BLACK`, `PLATINUM` |
 | `CardBehavior` | `CREDIT`, `INSTANT_PAYMENT` |
@@ -46,7 +46,7 @@ ms-banks owns the user's financial instruments at the bank level: the bank catal
 - **`BankNumber`** — three-digit BCRA entity code; prefix of every CBU issued by that bank.
 - **`Cbu`** — 22-digit Argentine CBU (`bankNumber[3] + sucursalCode[4] + checkDigit1[1] + accountNumber[13] + checkDigit2[1]`). `Cbu.from(String)` validates both BCRA modulo-10 check digits.
 - Every Account is addressed by its CBU string throughout the API (path variables, query params, Kafka payloads). `bankNumber` query filters use the 3-digit code.
-- `INVESTMENT` accounts carry metadata only — the aggregate throws `AccountInvestmentRestrictionException` on any balance adjustment attempt.
+- There is no `INVESTMENT` account type — it was removed. The investments "account" shown in the UI is a derived read-model in ms-investments (Σ price×qty keyed by `bankNumber`), not a real bank account; ms-banks holds only `CHECKING` and `SAVINGS`.
 
 ### Response Envelope
 
@@ -99,7 +99,7 @@ erDiagram
         Long bankId FK
         Long userId
         string name
-        string type "CHECKING | SAVINGS | INVESTMENT"
+        string type "CHECKING | SAVINGS"
         decimal balance
         string currency "ISO 4217"
         boolean isActive
@@ -308,7 +308,6 @@ Delivery is at-least-once via the outbox + relay (no `AFTER_COMMIT`/`Transaction
 | Dependency | Feign Client | Calls |
 |------------|-------------|-------|
 | ms-finances | `FinancesFeignClient` | `GET /api/v1/finances/transactions?accountCbu=...` — proxied on `GET /accounts/{cbu}/transactions` |
-| ms-investments | `InvestmentsFeignClient` | `GET /api/v1/investments/holdings/valuation?accountCbu=...` and `.../count` — used to enrich `INVESTMENT` account metadata |
 
 ---
 
@@ -386,8 +385,8 @@ back/ms-banks/src/main/java/com/financialapp/banks/
     │   │                            PaymentRecordedData, LowBalanceData, BalanceAdjustedData,
     │   │                            LoanReminderData, CardExpiringData, CardInstallmentDueData)
     │   └── mapper/
-    ├── client/                     (FinancesFeignClient, InvestmentsFeignClient)
-    │   └── adapter/                (FinancesClientAdapter, InvestmentsClientAdapter)
+    ├── client/                     (FinancesFeignClient, ExternalApiResponse)
+    │   └── adapter/                (FinancesClientAdapter)
     ├── scheduler/                  (BankAlertScheduler)
     └── config/                     (JPA, Kafka, Feign, serializers)
 ```
