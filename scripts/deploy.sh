@@ -29,6 +29,9 @@ if [[ "${1:-}" == "--update" ]]; then
   UPDATE_MODE=true
 fi
 
+# Production compose = base + pinned-version overlay
+COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.prod.yml)
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -166,12 +169,12 @@ fi
 # Update mode: pull pinned/latest images and restart the stack
 # ---------------------------------------------------------------------------
 if $UPDATE_MODE; then
-  info "Pulling app images (versions from .env, default latest) ..."
-  docker compose -f docker-compose.yml --profile app pull
+  info "Pulling app images (pinned in docker-compose.prod.yml) ..."
+  docker compose "${COMPOSE_FILES[@]}" --profile app pull
   info "Restarting stack ..."
-  docker compose -f docker-compose.yml --profile app up -d
+  docker compose "${COMPOSE_FILES[@]}" --profile app up -d
   success "Deploy updated. Status:"
-  docker compose -f docker-compose.yml ps
+  docker compose "${COMPOSE_FILES[@]}" ps
   exit 0
 fi
 
@@ -182,8 +185,8 @@ echo ""
 info "Server bootstrapped. Next steps for Production Deployment:"
 echo ""
 echo "  1. Start infra:   docker compose -f docker-compose.yml up -d postgres kafka minio traefik duckdns"
-echo "  2. Pull images:   docker compose -f docker-compose.yml --profile app pull"
-echo "  3. Start app:     docker compose -f docker-compose.yml --profile app up -d"
+echo "  2. Pull images:   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile app pull"
+echo "  3. Start app:     docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile app up -d"
 echo ""
 echo "  Subsequent deploys:  ./scripts/deploy.sh --update   (pulls repo + images, restarts)"
 echo "  Pin versions:        set <SERVICE>_VERSION in .env (e.g. FINANCES_VERSION=1.2.0)"
