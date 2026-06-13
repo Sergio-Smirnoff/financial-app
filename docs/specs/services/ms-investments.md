@@ -9,7 +9,7 @@
 
 ## Summary
 
-ms-investments tracks a user's investment portfolio. It stores holdings (what you own and at what cost), fetches live market prices from Invertir Online (IOL), computes unrealised P&L and allocation breakdowns, and checks notification thresholds after each price refresh. Buy/sell operations record a CBU-to-CBU transaction in ms-finances so that the funding account balance is updated correctly — the INVESTMENT account in ms-banks is metadata only and never receives direct balance movements.
+ms-investments tracks a user's investment portfolio. It stores holdings (what you own and at what cost), fetches live market prices from Invertir Online (IOL), computes unrealised P&L and allocation breakdowns, and checks notification thresholds after each price refresh. Buy/sell operations record a CBU-to-CBU transaction in ms-finances so that the funding account balance is updated correctly. A holding is keyed by `BankNumber`; there is no INVESTMENT account in ms-banks — the "investment account" is a derived read-model (Σ price×qty by bank+currency).
 
 ---
 
@@ -19,7 +19,7 @@ ms-investments tracks a user's investment portfolio. It stores holdings (what yo
 
 | Class | Type | Key fields |
 |---|---|---|
-| `Holding` | Aggregate (record) | `HoldingId`, `UserId`, `Cbu accountCbu` (metadata), `Ticker`, `name`, `AssetType`, `HoldingQuantity`, `Money avgPurchasePrice`, `ThresholdConfig`, `NotificationTimestamps` |
+| `Holding` | Aggregate (record) | `HoldingId`, `UserId`, `BankNumber`, `Ticker`, `name`, `AssetType`, `HoldingQuantity`, `Money avgPurchasePrice`, `ThresholdConfig`, `NotificationTimestamps` |
 | `AssetPrice` | Entity (record) | `AssetPriceId`, `Ticker`, `AssetType`, `lastPrice`, `currency`, `openPrice`, `highPrice`, `lowPrice`, `volume`, `dailyVariation`, `pricedAt`, `updatedAt` |
 | `AssetPriceHistory` | Entity (record) | `AssetPriceHistoryId`, `Ticker`, `AssetType`, `lastPrice`, `openPrice`, `highPrice`, `lowPrice`, `volume`, `dailyVariation`, `currency`, `pricedAt` |
 | `MarketQuote` | Read model | `ticker`, `lastPrice`, `dailyVariation` — used for market discovery panel |
@@ -30,7 +30,7 @@ ms-investments tracks a user's investment portfolio. It stores holdings (what yo
 | `Ticker` | VO | String symbol, e.g. `GGAL`, `AAPL` |
 | `HoldingQuantity` | VO | Positive `BigDecimal` quantity |
 | `Money` | VO | `amount` + `java.util.Currency` |
-| `Cbu` | VO | 22-digit string — account CBU; `accountCbu` on Holding is **metadata only** (never a money endpoint) |
+| `BankNumber` | VO | 3-digit BCRA bank code — the bank a holding belongs to; holdings are grouped by `(bankNumber, currency)` into the derived investment read-model |
 | `UserId` | VO | `Long` |
 
 ### AssetType enum
@@ -214,7 +214,7 @@ When a threshold is breached:
 
 ## Bank-Contract Integration (Buy / Sell Cash Flow)
 
-INVESTMENT accounts in ms-banks throw `AccountInvestmentRestrictionException` on any balance movement — they are metadata only. Cash for buys and sells flows exclusively through ms-finances as CBU-to-CBU transactions.
+There is no INVESTMENT account in ms-banks — it was removed. A holding belongs to a `BankNumber`, and the "investment account" is a derived read-model. Cash for buys and sells flows exclusively through ms-finances as CBU-to-CBU transactions.
 
 **Buy flow:**
 
@@ -222,7 +222,6 @@ INVESTMENT accounts in ms-banks throw `AccountInvestmentRestrictionException` on
 fundingCbu (owned) → brokerSentinelCbu(currency) [unowned]
 ms-finances persists tx → emits finances.transaction.created (CloudEvent)
 ms-banks debits fundingCbu (sentinel unowned → no credit)
-investment account untouched
 ```
 
 **Sell flow:**
@@ -243,8 +242,8 @@ sequenceDiagram
     participant KFK as Kafka
     participant BNK as ms-banks
 
-    FE->>INV: POST /api/v1/investments/holdings<br/>{ accountCbu, fundingCbu, ticker, qty, price, currency }
-    INV->>INV: Holding.create(accountCbu=metadata)
+    FE->>INV: POST /api/v1/investments/holdings<br/>{ bankNumber, fundingCbu, ticker, qty, price, currency }
+    INV->>INV: Holding.create(bankNumber)
     INV->>FIN: POST /api/v1/finances/transactions<br/>{ fromCbu=fundingCbu, toCbu=brokerSentinel, amount, currency }
     FIN->>FIN: persist transaction
     FIN-->>INV: 201 TransactionResponse
@@ -252,7 +251,7 @@ sequenceDiagram
     INV-->>FE: 201 HoldingResponse
     FIN--)KFK: finances.transaction.created
     KFK--)BNK: debit fundingCbu
-    Note over BNK: brokerSentinel unowned → no credit<br/>investment account never touched
+    Note over BNK: brokerSentinel unowned → no credit
 ```
 
 ---
@@ -283,8 +282,7 @@ sequenceDiagram
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/v1/investments/holdings` | List user holdings, paginated; optional `?assetType=` filter |
-| `GET` | `/api/v1/investments/holdings/valuation?accountCbu=` | Total valuation for holdings linked to a given CBU |
-| `GET` | `/api/v1/investments/holdings/count?accountCbu=` | Count of holdings linked to a given CBU |
+| `GET` | `/api/v1/investments/holdings/valuation?bankNumber=&currency=` | Total valuation for a user's holdings in a bank + currency (the derived investment read-model) |
 | `POST` | `/api/v1/investments/holdings` | Create a new holding (records buy transaction in ms-finances if `fundingCbu` provided) |
 | `PUT` | `/api/v1/investments/holdings/{id}` | Update holding fields |
 | `DELETE` | `/api/v1/investments/holdings/{id}?destinationCbu=` | Close (sell) a holding; records sale proceeds transaction in ms-finances if `destinationCbu` provided |
