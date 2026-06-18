@@ -1,0 +1,20 @@
+{
+  "uid": "fa-basic",
+  "title": "Financial App — Basic",
+  "tags": ["financial-app"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {"id":1,"type":"stat","title":"Services Up","gridPos":{"h":6,"w":6,"x":0,"y":0},
+     "targets":[{"refId":"A","expr":"sum(up)"}]},
+    {"id":2,"type":"timeseries","title":"JVM Heap Used (bytes)","gridPos":{"h":8,"w":18,"x":6,"y":0},
+     "targets":[{"refId":"A","expr":"jvm_memory_used_bytes{area=\"heap\"}","legendFormat":"{{instance}}"}]},
+    {"id":3,"type":"timeseries","title":"HTTP Request Rate (req/s)","gridPos":{"h":8,"w":12,"x":0,"y":8},
+     "targets":[{"refId":"A","expr":"sum by (instance) (rate(http_server_requests_seconds_count[5m]))","legendFormat":"{{instance}}"}]},
+    {"id":4,"type":"timeseries","title":"Process CPU Usage","gridPos":{"h":8,"w":12,"x":12,"y":8},
+     "targets":[{"refId":"A","expr":"process_cpu_usage","legendFormat":"{{instance}}"}]}
+  ]
+}

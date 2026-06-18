@@ -275,6 +275,7 @@ services:
       IOL_USERNAME: ${IOL_USERNAME}
       IOL_PASSWORD: ${IOL_PASSWORD}
       BANKS_SERVICE_URL: ${BANKS_SERVICE_URL}
+      FINANCES_SERVICE_URL: ${FINANCES_SERVICE_URL}
 
   frontend:
     profiles: [app]
