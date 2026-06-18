@@ -93,7 +93,7 @@ elif [[ ! -f "$ENV_FILE" ]]; then
     sed -i "s/DUCKDNS_TOKEN=.*/DUCKDNS_TOKEN=${DUCK_TOKEN}/" "$ENV_FILE"
     sed -i "s/DUCKDNS_DOMAIN=.*/DUCKDNS_DOMAIN=${DUCK_SUB}/" "$ENV_FILE"
   fi
-  sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://${DOMAIN_NAME},http://localhost,http://192.168.0.218|" "$ENV_FILE"
+  sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://${DOMAIN_NAME},http://localhost|" "$ENV_FILE"
   sed -i "s|NEXT_PUBLIC_GATEWAY_URL=.*|NEXT_PUBLIC_GATEWAY_URL=https://${DOMAIN_NAME}/api|" "$ENV_FILE"
   
   success ".env generated successfully."
@@ -135,7 +135,7 @@ if $MISSING_VARS; then
     fi
     # Update URLs to match new domain
     DOMAIN_NAME=$(grep "^DOMAIN_NAME=" "$ENV_FILE" | cut -d'=' -f2-)
-    sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://${DOMAIN_NAME},http://localhost,http://192.168.0.218|" "$ENV_FILE"
+    sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://${DOMAIN_NAME},http://localhost|" "$ENV_FILE"
     sed -i "s|NEXT_PUBLIC_GATEWAY_URL=.*|NEXT_PUBLIC_GATEWAY_URL=https://${DOMAIN_NAME}/api|" "$ENV_FILE"
     success "Environment updated."
   fi
