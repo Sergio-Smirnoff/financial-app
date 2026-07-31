@@ -23,7 +23,7 @@ by itself, the test has to exist for the service in question.
 
 ## 3. Package convention
 
-Identical across all 7 backend services. Reproduced verbatim from `CLAUDE.md` §4 — do not
+Identical across all 7 backend services. Canonical form — do not
 compress or reorder this tree, it is the single most-consulted artifact in the repo:
 
 ```
@@ -64,7 +64,7 @@ service. It consumes `commons-core` only, not `commons-web`.
 
 ## 5. Aggregate rules
 
-From `rules.md` §1:
+Aggregate and value-object invariants that hold in every service:
 
 - Aggregates own their invariants — validation and computation happen on the entity or VO that owns the data, never in a use case or a helper.
 - Value objects are immutable and validate themselves in the constructor; no outside service is needed to make them consistent.
