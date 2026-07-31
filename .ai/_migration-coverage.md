@@ -13,7 +13,7 @@ transcribed by hand. Every row must reach `Verified: yes` before Task 11 deletes
 | `CLAUDE.md` | 34-54 | ## 1. Does this file work for other AI tools? | ARCHITECTURE.md § AI context layer | no |
 | `CLAUDE.md` | 55-86 | ## 2. System map | ARCHITECTURE.md | no |
 | `CLAUDE.md` | 87-122 | ## 3. Domain model catalog (bird's-eye — see each service spec for full ER diagrams) | DROPPED (P2) | no |
-| `CLAUDE.md` | 123-174 | ## 4. DDD layering (every backend service, identical shape) | split: layering prose → `.ai/skills/ddd/SKILL.md`; package tree → `.ai/references/APP_STRUCTURE.md` | no |
+| `CLAUDE.md` | 123-174 | ## 4. DDD layering (every backend service, identical shape) | split: layering prose → `.ai/skills/ddd/SKILL.md`; package tree → `.ai/references/APP_STRUCTURE.md` | yes |
 | `CLAUDE.md` | 175-207 | ## 5. Naming conventions | RULES.md R7 | no |
 | `CLAUDE.md` | 208-221 | ## 6. Response envelope (every endpoint, every service) | APP_STRUCTURE.md | no |
 | `CLAUDE.md` | 222-236 | ## 7. Comment policy | RULES.md R9 | no |
@@ -21,8 +21,8 @@ transcribed by hand. Every row must reach `Verified: yes` before Task 11 deletes
 | `CLAUDE.md` | 256-263 | ## 9. Approval before destructive changes | RULES.md R15 | no |
 | `CLAUDE.md` | 264-268 | ## Footer | DROPPED (navigation only) | no |
 | `docs/specs/rules.md` | 1-6 | # Implementation Rules | RULES.md (header) | no |
-| `docs/specs/rules.md` | 7-23 | ## 1. DDD Always | skills/ddd | no |
-| `docs/specs/rules.md` | 24-44 | ## 2. SOLID & OOP Principles | skills/solid | no |
+| `docs/specs/rules.md` | 7-23 | ## 1. DDD Always | skills/ddd | yes |
+| `docs/specs/rules.md` | 24-44 | ## 2. SOLID & OOP Principles | skills/solid | yes |
 | `docs/specs/rules.md` | 45-50 | ## 3. ApiResponse\<T\> Envelope | APP_STRUCTURE.md | no |
 | `docs/specs/rules.md` | 51-60 | ### 3.1 Fields | APP_STRUCTURE.md | no |
 | `docs/specs/rules.md` | 61-71 | ### 3.2 Success example | APP_STRUCTURE.md | no |
@@ -56,7 +56,7 @@ transcribed by hand. Every row must reach `Verified: yes` before Task 11 deletes
 | `docs/specs/architecture.md` | 52-82 | ## 2. Runtime topology | ARCHITECTURE.md | no |
 | `docs/specs/architecture.md` | 83-122 | ## 3. Auth / cookie / CSRF flow | APP_STRUCTURE.md | no |
 | `docs/specs/architecture.md` | 123-141 | ## 4. Data stores | ARCHITECTURE.md | no |
-| `docs/specs/architecture.md` | 142-163 | ## 5. DDD layering | skills/ddd | no |
+| `docs/specs/architecture.md` | 142-163 | ## 5. DDD layering | skills/ddd | yes |
 | `docs/specs/architecture.md` | 164-182 | ## 6. CI/CD | PIPELINE.md | no |
 | `docs/specs/deployment.md` | 1-2 | # Deployment & Dev-Ops | DEPLOYMENT.md (header) | no |
 | `docs/specs/deployment.md` | 3-29 | ## 1. scripts/dev.sh Command Reference | SCRIPTS.md | no |
