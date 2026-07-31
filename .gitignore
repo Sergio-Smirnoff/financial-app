@@ -2,7 +2,6 @@
 .env
 .env.local
 .env.production
-.claude
 package-lock.json
 package.json
 docs/superpowers
@@ -56,11 +55,16 @@ front/financial-app/
 git-manager.sh
 .dev-pids
 
-CLAUDE.md
+# Generated AI entry points — canonical content lives in .ai/ (see scripts/ai-link.sh)
+/CLAUDE.md
+/AGENTS.md
+/GEMINI.md
+/.mcp.json
+/.claude/
+/.gemini/
 
 .worktrees/
 .aider*
-.claude/
 
 # Superpowers brainstorm visual companion (mockups, transient)
 .superpowers/
