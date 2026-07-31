@@ -24,6 +24,9 @@ ms-investments tracks a user's investment portfolio. It stores holdings (what yo
 | `AssetPriceHistory` | Entity (record) | `AssetPriceHistoryId`, `Ticker`, `AssetType`, `lastPrice`, `openPrice`, `highPrice`, `lowPrice`, `volume`, `dailyVariation`, `currency`, `pricedAt` |
 | `MarketQuote` | Read model | `ticker`, `lastPrice`, `dailyVariation` — used for market discovery panel |
 | `PortfolioSnapshot` | Entity | Daily EOD snapshot of per-currency totals for evolution chart |
+| `FxRate` | Aggregate (record) | `FxRateId`, `date`, `FxView` (`MEP`/`CCL`/`OFICIAL`), `buy`, `sell`, `FxRateSource` (`IOL_SYNTHETIC`/`IOL_DIRECT`/`MANUAL`) |
+| `MarketIndex` | Aggregate (record) | `code`, `value`, `variation`, `updatedAt` (points/bps value; variation is % for MERVAL/SP500, absolute point delta for RIESGO_PAIS) |
+| `BrokerFeeSchedule` | Aggregate (record) | `BrokerFeeScheduleId`, `BankNumber`, `AssetType` (nullable), `buyFeePct`, `sellFeePct`, `minimumFee`, `marketFeePct`, `IvaTreatment` |
 | `RefreshJob` | Entity | Tracks in-flight / completed price refresh jobs |
 | `ThresholdConfig` | VO | `gainPct`, `lossPct` (both nullable NUMERIC(5,2); must be >= 0) |
 | `NotificationTimestamps` | VO | `lastGainNotifiedAt`, `lastLossNotifiedAt` (both nullable) |
@@ -274,6 +277,9 @@ sequenceDiagram
 | V10 | Creates `refresh_jobs` table |
 | V11 | `portfolio_snapshots.totals_by_currency` as JSONB |
 | V12 | Bank-contract migration: drops `bank_account_id` + `bank_id`; adds `account_cbu VARCHAR(22)` + index |
+| V15 | Creates `fx_rates` table (`rate_date`, `fx_view`, `buy`, `sell`, `source`, UNIQUE on `(rate_date, fx_view)`) |
+| V16 | Creates `market_indices` table (`code` PK, `value`, `variation`, `updated_at`) |
+| V17 | Creates `broker_fee_schedules` table (`bank_number`, `asset_type`, fee pcts, `minimum_fee`, `iva_treatment`, `UNIQUE NULLS NOT DISTINCT (bank_number, asset_type)`) |
 
 ---
 
@@ -315,6 +321,23 @@ sequenceDiagram
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/v1/investments/market/discovery?limit=` | Trending assets not already in the user's portfolio (default limit 5) |
+| `GET` | `/api/v1/investments/market/panel` | Widened market panel containing quotes, indices (MERVAL/SP500/RIESGO_PAIS), and latest FX rates |
+
+### FX Rates — `/api/v1/investments/fx/rates`
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/v1/investments/fx/rates?from=&to=&view=` | Historical persisted FX rates |
+| `GET` | `/api/v1/investments/fx/rates/latest` | Latest persisted FX rate for each view |
+| `GET` | `/api/v1/investments/fx/rates/at?date=` | Computed FX rates passthrough at a specific date (never persisted; rateDate = requested date) |
+| `POST` | `/api/v1/investments/fx/rates/backfill?from=&to=` | Idempotent backfill of FX rates for a date range |
+
+### Broker Fees — `/api/v1/investments/fees/brokers`
+
+| Method | Path | Purpose |
+|---|---|---|
+| `PUT` | `/api/v1/investments/fees/brokers/{bankNumber}` | Upsert fee schedule for a broker/bank |
+| `GET` | `/api/v1/investments/fees/brokers` | List all broker fee schedules |
 
 All endpoints return the shared envelope `{ status, title, code, message, data }` from `commons-core` — `code` only on errors, carrying the service `DomainError` slug. Numeric response fields are serialised as `String` to avoid JSON precision loss.
 

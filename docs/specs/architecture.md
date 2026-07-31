@@ -39,7 +39,7 @@ graph TD
 
 | Module | Contents | Consumed by |
 | :-- | :-- | :-- |
-| `commons-core` | `ApiResponse` envelope `{status, title, code, message, data}`, `ErrorCategory`, `ErrorCode` interface, `DomainException` base | all 7 services (framework-free except `HttpStatus`/Jackson — safe in domain layers) |
+| `commons-core` | `ApiResponse` envelope `{status, title, code, message, data}`, `ErrorCategory`, `ErrorCode` interface, `DomainException` base, `com.financialapp.commons.core.domain.model` shared zero-behavior vocabulary (`IvaTreatment`, cursor-shaped `PageResult<T>`) | all 7 services (framework-free except `HttpStatus`/Jackson — safe in domain layers). A value type with zero behavior, needed identically by ≥2 bounded contexts with no natural single owner, is shared this way — behavior stays in each service. |
 | `commons-web` | `ApiExceptionHandler` base advice, static `ErrorCategoryHttpMapper`, `CommonErrorCode`, `@ApiErrorCodes` + Swagger error-example generation, OpenAPI auto-config | the 6 servlet services (ms-gateway is WebFlux → commons-core only) |
 | `commons-messaging` | CloudEvents Kafka plumbing — `OutboxGateway`/`ProcessedEventGateway`/`DomainEventMapper` ports, `OutboxRecord`/`EventType`/`CeAttributes` VOs, `OutboxRelay`, `IdempotentEventProcessor`, `CloudEventSerde`, `CeHeaders`, `StandardDlqErrorHandler` | the event-driven services (producers + consumers) |
 

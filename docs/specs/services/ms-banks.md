@@ -25,21 +25,31 @@ ms-banks owns the user's financial instruments at the bank level: the bank catal
 | Aggregate | Key VOs | Notes |
 |-----------|---------|-------|
 | `Bank` | `BankNumber` (3-digit BCRA code), `Logo` | Read-only catalog seeded at startup; no per-user Bank mutation |
-| `Account` | `Cbu` (22-digit, two BCRA check digits), `AccountNumber`, `SucursalCode`, `Money`, `UserId` | Abstract root with three subtypes: `CheckingAccount`, `SavingsAccount`, `InvestmentAccount` |
-| `Card` | `CardNumber` (16 digits, Luhn), `CardDetails` (`CardBrand`, `CardType`, `CardBehavior`, `YearMonth`, `CardBilling`) | Abstract root: `CreditCard` (supports installments), `DebitCard` (INSTANT\_PAYMENT) |
+| `Account` | `Cbu` (22-digit, two BCRA check digits), `AccountNumber`, `SucursalCode`, `Money`, `UserId` | Abstract root with two subtypes: `CheckingAccount`, `SavingsAccount` |
+| `Card` | `CardNumber` (16 digits, Luhn), `CardDetails` (`CardBrand`, `CardType`, `CardBehavior`, `YearMonth`, `CardBilling`, `creditLimit`) | Abstract root: `CreditCard` (supports installments & credit limit), `DebitCard` (INSTANT\_PAYMENT) |
 | `CardInstallment` | `CardInstallmentId`, `Money` | Record; immutable `pay()` returns a new instance |
 | `Loan` | `LoanId`, `BankNumber`, `Money`, `AmortizationType` (FRENCH only) | Record; `originate()` factory builds full schedule via `LoanAmortization` |
 | `LoanInstallment` | `LoanInstallmentId`, `Money` | Record; immutable `pay()` |
+| `BalanceSnapshot` | `BalanceSnapshotId`, `UserId`, `LocalDate`, `cashByCurrency`, `cardDebtByCurrency`, `loanDebtByCurrency` | Daily net worth snapshot record generated automatically by scheduler |
+| `AccountFeeSchedule` | `AccountFeeScheduleId`, `Cbu`, `maintenanceFee`, `transferFee`, `IvaTreatment` | Account fee schedule display metadata (fees do NOT post transactions) |
+| `CardFeeSchedule` | `CardFeeScheduleId`, `CardNumber`, `annualFee`, `internationalSurchargePct`, `IvaTreatment` | Card fee schedule display metadata (fees do NOT post transactions) |
 
-### Enumerations
+### Enumerations & Domain Services
 
-| Enum | Values |
-|------|--------|
-| `AccountType` | `CHECKING`, `SAVINGS` |
-| `CardBrand` | `VISA`, `MASTERCARD`, `AMEX` |
-| `CardType` | `STANDARD`, `SILVER`, `GOLD`, `BLACK`, `PLATINUM` |
-| `CardBehavior` | `CREDIT`, `INSTANT_PAYMENT` |
-| `AmortizationType` | `FRENCH` |
+| Element | Kind | Values / Details |
+|---------|------|------------------|
+| `AccountType` | Enum | `CHECKING`, `SAVINGS` |
+| `CardBrand` | Enum | `VISA`, `MASTERCARD`, `AMEX` |
+| `CardType` | Enum | `STANDARD`, `SILVER`, `GOLD`, `BLACK`, `PLATINUM` |
+| `CardBehavior` | Enum | `CREDIT`, `INSTANT_PAYMENT` |
+| `AmortizationType` | Enum | `FRENCH` |
+| `IvaTreatment` | Enum (commons) | `SEPARATE`, `INCLUDED`, `EXEMPT` |
+| `ComputeBalanceSnapshot` | Domain Service | Consolidates cash balances, current statement unpaid card installments, and active loan principal by currency |
+| `CardBillingCycle` | Domain Service | Calculates current/previous billing periods with month-end date clamping and due day month rolling |
+| `CreditLimitUsage` | Domain Service | Computes card used amount and credit limit utilization percentage |
+| `DebitCreditTax` | Domain Service | Computes tax rate based on account type (`CHECKING` → 0.006, `SAVINGS` → 0.000) |
+
+> **Note on Import Health:** Import health and provider status are gateway-composed dynamically from downstream integrations and are not stored in ms-banks.
 
 ### CBU / BankNumber Contract
 
@@ -118,6 +128,7 @@ erDiagram
         date expiringDate
         int closingDay
         int dueDay
+        decimal creditLimit
         datetime createdAt
         datetime updatedAt
     }
@@ -167,11 +178,41 @@ erDiagram
         datetime updatedAt
     }
 
+    BalanceSnapshot {
+        Long id PK
+        Long userId
+        date snapshotDate
+        jsonb cashByCurrency
+        jsonb cardDebtByCurrency
+        jsonb loanDebtByCurrency
+        datetime createdAt
+    }
+
+    AccountFeeSchedule {
+        Long id PK
+        string accountCbu UK FK
+        decimal maintenanceFee
+        decimal transferFee
+        string ivaTreatment
+        string currency
+    }
+
+    CardFeeSchedule {
+        Long id PK
+        string cardNumber UK FK
+        decimal annualFee
+        decimal internationalSurchargePct
+        string ivaTreatment
+        string currency
+    }
+
     Bank ||--o{ Account : "holds"
     Bank ||--o{ Card    : "issues"
     Bank ||--o{ Loan    : "grants"
     Card ||--o{ CardInstallment : "schedules"
     Loan ||--o{ LoanInstallment : "amortises"
+    Account ||--o| AccountFeeSchedule : "has"
+    Card ||--o| CardFeeSchedule : "has"
 ```
 
 ---
@@ -237,10 +278,10 @@ sequenceDiagram
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/api/v1/banks/cards` | List user cards; optional `?bankNumber=` filter |
+| `GET` | `/api/v1/banks/cards` | List user cards; optional `?bankNumber=` filter (returns `CardResponse` with `creditLimit`, `usedAmount`, `usedPercent`, `closingDate`, `dueDate`, `statementOpen`) |
 | `GET` | `/api/v1/banks/cards/{cardNumber}` | Get one card by 16-digit card number |
-| `POST` | `/api/v1/banks/cards` | Issue (create) a card |
-| `PATCH` | `/api/v1/banks/cards/{cardNumber}` | Update billing cycle (closingDay, dueDay) and expiry date |
+| `POST` | `/api/v1/banks/cards` | Issue (create) a card (accepts optional `creditLimit`) |
+| `PATCH` | `/api/v1/banks/cards/{cardNumber}` | Update billing cycle, expiry date, or optional `creditLimit` |
 | `DELETE` | `/api/v1/banks/cards/{cardNumber}` | Cancel (delete) a card |
 
 ### CardInstallmentController — `/api/v1/banks/cards/{cardNumber}/installments`
@@ -264,6 +305,20 @@ sequenceDiagram
 | `DELETE` | `/api/v1/banks/loans/{id}` | Cancel (delete) a loan |
 | `GET` | `/api/v1/banks/loans/{id}/installments` | List installments for a loan |
 | `POST` | `/api/v1/banks/loans/{id}/installments/{installmentId}/pay` | Mark one loan installment as paid from a given account CBU |
+
+### FeeController — `/api/v1/banks/fees`
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `PUT` | `/api/v1/banks/accounts/{cbu}/fees` | Upsert fee schedule (maintenance/transfer fees, IVA treatment) for an account |
+| `PUT` | `/api/v1/banks/cards/{cardNumber}/fees` | Upsert fee schedule (annual fee, international surcharge %, IVA treatment) for a card |
+| `GET` | `/api/v1/banks/fees` | Get all account and card fee schedules for user, including computed debit/credit tax rates |
+
+### BalanceSnapshotController — `/api/v1/banks/balance-snapshots`
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/api/v1/banks/balance-snapshots?from=&to=` | Daily balance snapshot history by currency for net worth trend calculation |
 
 ### MetadataController — `/api/v1/banks/metadata`
 
@@ -302,6 +357,7 @@ Delivery is at-least-once via the outbox + relay (no `AFTER_COMMIT`/`Transaction
 | Job | Schedule | Action |
 |-----|----------|--------|
 | `BankAlertScheduler.runDailyAlerts()` | `0 0 8 * * *` (daily 08:00) | Checks card expirations (≤30 days), upcoming loan installments (≤3 days), upcoming card installments (≤3 days), low-balance accounts (< 500) — writes `banks.card.expiring` / `banks.loan.reminder` / `banks.card.installment_due` / `banks.account.low_balance` events to the outbox. On serialization/outbox failure it logs the stack trace and rethrows so the `@Transactional` run rolls back. |
+| `BalanceSnapshotScheduler.captureDailySnapshots()` | `0 0 0 * * *` (daily 00:00) | Captures daily balance snapshots for all active accounts, unpaid card installments in current statement, and loan balance per user with isolated per-user error handling. |
 
 ---
 
@@ -321,16 +377,18 @@ back/ms-banks/src/main/java/com/financialapp/banks/
 ├── web/                            ← HTTP layer
 │   ├── controller/
 │   │   ├── AccountController
+│   │   ├── BalanceSnapshotController
 │   │   ├── BankController
 │   │   ├── CardController
 │   │   ├── CardInstallmentController
+│   │   ├── FeeController
 │   │   ├── LoanController
 │   │   ├── MetadataController
 │   │   └── UpcomingPaymentController
 │   ├── dto/
-│   │   ├── request/                (AccountRequest, CardRequest, LoanRequest, …)
-│   │   └── response/               (AccountResponse, CardResponse, … — envelope from commons-core)
-│   ├── mapper/                     (AccountWebMapper, CardWebMapper, LoanWebMapper, …)
+│   │   ├── request/                (AccountRequest, CardRequest, LoanRequest, FeeScheduleRequest, …)
+│   │   └── response/               (AccountResponse, CardResponse, BalanceSnapshotResponse, UserFeesResponse, … — envelope from commons-core)
+│   ├── mapper/                     (AccountWebMapper, CardWebMapper, BalanceSnapshotWebMapper, FeeWebMapper, LoanWebMapper, …)
 │   └── error/                      (GlobalExceptionHandler)
 │
 ├── application/                    ← Use-case implementations
@@ -342,6 +400,8 @@ back/ms-banks/src/main/java/com/financialapp/banks/
 │   │                                ListCards, RegisterCardExpense,
 │   │                                ListCardInstallments, PayCardInstallment,
 │   │                                ImportCardExpenses, CheckDuplicateExpenses)
+│   ├── fee/impl/                   (UpsertAccountFeeSchedule, UpsertCardFeeSchedule, GetUserFees)
+│   ├── snapshot/impl/              (GetBalanceSnapshots)
 │   ├── catalog/impl/               (GetBankingCatalog)
 │   ├── loan/impl/                  (OriginateLoan, ListLoans, GetLoanInstallments,
 │   │                                PayLoanInstallment, CancelLoan)
@@ -357,24 +417,28 @@ back/ms-banks/src/main/java/com/financialapp/banks/
 │   │   │                            CardBrand, CardType, CardBehavior,
 │   │   │                            CardBilling, CardNumber, IssuerBin,
 │   │   │                            cardPaymentMethod/…)
+│   │   ├── fee/                    (AccountFeeSchedule, AccountFeeScheduleId,
+│   │   │                            CardFeeSchedule, CardFeeScheduleId)
+│   │   ├── snapshot/               (BalanceSnapshot, BalanceSnapshotId)
 │   │   └── loan/                   (Loan, LoanInstallment, LoanId,
 │   │                                LoanOrigination, AmortizationType)
 │   ├── usecase/                    (use-case interfaces + command records)
-│   ├── repository/                 (AccountRepository, CardRepository, …)
+│   ├── repository/                 (AccountRepository, CardRepository, BalanceSnapshotRepository, AccountFeeScheduleRepository, CardFeeScheduleRepository, …)
 │   ├── port/                       (DomainEventPublisher, InvestmentsPort)
-│   ├── service/                    (LoanAmortization)
+│   ├── service/                    (LoanAmortization, ComputeBalanceSnapshot, CardBillingCycle, CreditLimitUsage, DebitCreditTax)
 │   ├── event/                      (BalanceAdjustedEvent, LowBalanceEvent,
 │   │                                LoanCreatedEvent, LoanInstallmentPaidEvent,
 │   │                                CardInstallmentPaidEvent)
 │   └── exception/                  (DomainException, DomainError, ErrorCategory,
-│                                    account/*, bank/*, card/*, cbu/*, loan/*)
+│                                    account/*, bank/*, card/*, cbu/*, fee/*, loan/*, snapshot/*)
 │
 └── infrastructure/                 ← Spring / JPA / Kafka / Feign
     ├── persistence/
     │   ├── entity/                 (AccountJpaEntity, BankJpaEntity,
     │   │                            CardJpaEntity, CardInstallmentJpaEntity,
     │   │                            LoanJpaEntity, LoanInstallmentJpaEntity,
-    │   │                            OutboxEventEntity)
+    │   │                            BalanceSnapshotJpaEntity, AccountFeeScheduleJpaEntity,
+    │   │                            CardFeeScheduleJpaEntity, OutboxEventEntity)
     │   ├── jpa/                    (Spring Data JPA repositories)
     │   ├── mapper/                 (JPA ↔ domain mappers)
     │   ├── repository/             (domain port implementations)
@@ -389,7 +453,7 @@ back/ms-banks/src/main/java/com/financialapp/banks/
     │   └── mapper/
     ├── client/                     (FinancesFeignClient, ExternalApiResponse)
     │   └── adapter/                (FinancesClientAdapter)
-    ├── scheduler/                  (BankAlertScheduler)
+    ├── scheduler/                  (BankAlertScheduler, BalanceSnapshotScheduler)
     └── config/                     (JPA, Kafka, Feign, serializers)
 ```
 
@@ -413,6 +477,10 @@ back/ms-banks/src/main/java/com/financialapp/banks/
 | V12 | Normalise legacy `card_behavior` values |
 | V13 | Add `bank_number` column to `banks` |
 | V14 | Change `bank_number` to `varchar` |
+| V20 | Create `balance_snapshots` table with JSONB maps for cash/card/loan currency totals |
+| V21 | Add `credit_limit` column to `cards` table |
+| V22 | Create `account_fee_schedules` table |
+| V23 | Create `card_fee_schedules` table |
 
 ---
 

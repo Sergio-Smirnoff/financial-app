@@ -210,6 +210,29 @@ erDiagram
         Long categoryId FK
         String description
         LocalDate date
+        String paymentMethod
+        String note
+    }
+    Budget {
+        Long id PK
+        Long userId
+        Long categoryId FK
+        Integer year
+        Integer month
+        BigDecimal amount
+        String currency
+        BigDecimal alertThresholdPct
+        Integer lastAlertedYear
+        Integer lastAlertedMonth
+    }
+    CategorizationRule {
+        Long id PK
+        Long userId
+        String matchType
+        String pattern
+        Long categoryId FK
+        Integer matchCount
+        LocalDateTime createdAt
     }
     Category {
         Long id PK
@@ -235,42 +258,12 @@ erDiagram
     ProcessedInboundEvent {
         String dedupKey PK
     }
-    Loan {
-        Long id PK
-        Long userId
-        BigDecimal principalAmount
-        String currency
-        Integer installments
-    }
-    LoanInstallment {
-        Long id PK
-        Long loanId FK
-        Integer number
-        BigDecimal amount
-        LocalDate dueDate
-        Boolean paid
-    }
-    CardExpense {
-        Long id PK
-        Long userId
-        BigDecimal amount
-        String currency
-        Integer installments
-    }
-    CardExpenseInstallment {
-        Long id PK
-        Long cardExpenseId FK
-        Integer number
-        BigDecimal amount
-        LocalDate dueDate
-        Boolean paid
-    }
 
     Transaction ||--o| Category : "categorised by"
     Category ||--o{ Subcategory : "contains"
+    Budget ||--o| Category : "targets"
+    CategorizationRule ||--o| Category : "assigns"
     Transaction ||--o{ OutboxEvent : "produces"
-    Loan ||--o{ LoanInstallment : "split into"
-    CardExpense ||--o{ CardExpenseInstallment : "split into"
 ```
 
 ---

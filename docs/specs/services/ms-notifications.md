@@ -34,7 +34,7 @@ ms-notifications/src/main/java/com/financialapp/notifications/
 │   │   ├── notification/
 │   │   │   ├── Notification.java       # Domain record
 │   │   │   ├── NotificationChannel.java # IN_APP | EMAIL | BOTH
-│   │   │   ├── NotificationType.java   # Enum (10 values)
+│   │   │   ├── NotificationType.java   # Enum (11 values)
 │   │   │   └── UserNotificationPreference.java
 │   │   └── pagination/PageResult.java
 │   ├── repository/
@@ -141,12 +141,37 @@ erDiagram
         TIMESTAMP    updated_at
     }
 
+    NOTIFICATION_PREFERENCES {
+        BIGSERIAL   id             PK
+        BIGINT      user_id        "NOT NULL"
+        VARCHAR(30) category       "NOT NULL"
+        BOOLEAN     in_app_enabled "DEFAULT true"
+        BOOLEAN     email_enabled  "DEFAULT false"
+        TIMESTAMP   created_at     "DEFAULT NOW()"
+        TIMESTAMP   updated_at     "DEFAULT NOW()"
+    }
+
     USER_NOTIFICATION_PREFERENCES ||--o{ NOTIFICATION : "user_id"
+    NOTIFICATION_PREFERENCES ||--o{ NOTIFICATION : "user_id"
 ```
 
-**NotificationType values:** `PAYMENT_DUE`, `LOAN_REMINDER`, `INSTALLMENT_REMINDER`, `INVESTMENT_THRESHOLD`, `USER_REGISTERED`, `MONTHLY_SUMMARY`, `CARD_EXPIRING`, `LOW_BALANCE`, `TRANSFER_SENT`, `TRANSFER_RECEIVED`
+**NotificationType values (13):** `PAYMENT_DUE`, `LOAN_REMINDER`, `INSTALLMENT_REMINDER`, `INVESTMENT_THRESHOLD`, `USER_REGISTERED`, `MONTHLY_SUMMARY`, `CARD_EXPIRING`, `LOW_BALANCE`, `TRANSFER_SENT`, `TRANSFER_RECEIVED`, `BALANCE_ADJUSTED`, `BUDGET_THRESHOLD_REACHED`, `IMPORT_STALE`
 
-**NotificationChannel values:** `IN_APP`, `EMAIL`, `BOTH` — the `sendInApp()` / `sendEmail()` helpers on the enum drive dispatch logic.
+**NotificationCategory mapping:**
+
+| NotificationType | NotificationCategory |
+|---|---|
+| `PAYMENT_DUE`, `CARD_EXPIRING`, `LOAN_REMINDER`, `INSTALLMENT_REMINDER` | `PAYMENT_DUE` |
+| `INVESTMENT_THRESHOLD` | `PORTFOLIO_ALERTS` |
+| `MONTHLY_SUMMARY` | `SUMMARY` |
+| `LOW_BALANCE`, `BALANCE_ADJUSTED`, `TRANSFER_SENT`, `TRANSFER_RECEIVED` | `ACCOUNT` |
+| `USER_REGISTERED` | `SYSTEM` |
+| `BUDGET_THRESHOLD_REACHED` | `BUDGET` |
+| `IMPORT_STALE` | `IMPORT_HEALTH` |
+
+*Note on category naming:* The category is `SUMMARY`, not `WEEKLY_SUMMARY`, because its primary member is `MONTHLY_SUMMARY` (seeded from `monthly_email_enabled`). `SUMMARY` covers present and future summary digests accurately.
+
+**NotificationChannel values:** `IN_APP`, `EMAIL`, `BOTH` — resolved per category via `NotificationChannelResolver`.
 
 ### Flyway Migrations
 
@@ -154,6 +179,9 @@ erDiagram
 |---------|-------------|
 | V1      | Creates `notifications.notifications` and `notifications.user_notification_preferences` tables |
 | V2      | Adds performance indexes: partial index on `read = false`, composite `(user_id, created_at DESC)` |
+| V3      | Creates `notifications.processed_events` table for CloudEvent dedup |
+| V4      | Creates `notifications.notification_delivery` table |
+| V5      | Creates `notifications.notification_preferences` per category & seeds `SUMMARY` rows from `user_notification_preferences` |
 
 ---
 
@@ -236,8 +264,12 @@ data: { id, userId, type, title, message, channel, read, metadata, createdAt }
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/api/v1/notifications/preferences` | Get current user's notification preferences |
-| `PUT` | `/api/v1/notifications/preferences` | Update preferences (`monthlyEmailEnabled`) |
+| `GET` | `/api/v1/notifications/preferences` | Legacy: get user's preferences (facade over `SUMMARY` category) |
+| `PUT` | `/api/v1/notifications/preferences` | Legacy: update preferences (`monthlyEmailEnabled`, facade over `SUMMARY` category) |
+| `GET` | `/api/v1/notifications/preferences/by-category` | Get all 7 notification categories with `hasUiToggle` flag |
+| `PUT` | `/api/v1/notifications/preferences/{category}` | Update channel preferences (`inAppEnabled`, `emailEnabled`) for a category |
+
+*Legacy facade note:* The old `/api/v1/notifications/preferences` endpoint acts as a thin facade over the `SUMMARY` category row in `notification_preferences`. Single source of truth is the per-category table. The old `user_notification_preferences` table is scheduled to be dropped in Wave 4 cleanup.
 
 All controllers read `X-User-Id` from the request header. Responses use the shared envelope
 `{ status, title, code, message, data }` from `commons-core`; `code` only on errors with the

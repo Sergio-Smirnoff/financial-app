@@ -9,7 +9,13 @@
 
 ## Summary
 
-`ms-users` is the sole authentication authority for the platform. It handles user registration, login, session refresh, and logout. All tokens live in HttpOnly cookies — the JavaScript layer never touches them directly. CSRF protection is enforced via `CookieCsrfTokenRepository`; auth endpoints are exempt. Downstream services receive the authenticated user's identity through the `X-User-Id` header injected by the gateway's `JwtAuthFilter`.
+`ms-users` is the sole authentication authority for the platform. It handles user registration, login, session registry management (`UserSession`), session refresh (with rotation, refresh-time revocation, and inactivity policy enforcement), server-side logout, user profile editing, change password (with other-session revocation), display/currency-format preferences (`UserPreferences`), and per-user manual currency rates (`ManualCurrencyRate`).
+
+All tokens live in HttpOnly cookies — the JavaScript layer never touches access or refresh tokens directly. CSRF protection is enforced via `CookieCsrfTokenRepository`; auth endpoints are exempt. Downstream services receive the authenticated user's identity through the `X-User-Id` header injected by the gateway's `JwtAuthFilter`.
+
+### Session Revocation Trade-off
+
+Revocation is enforced at **refresh time only**. The gateway's per-request HMAC verification remains fast and stateless. Revoking a session prevents future token refreshes; the active access token lives out its remaining ≤24h TTL.
 
 ---
 
@@ -20,35 +26,75 @@ back/ms-users/src/main/java/com/financialapp/users/
 ├── UsersApplication.java
 ├── application/
 │   ├── AuthenticateUserUseCaseImp.java
+│   ├── GetUserPreferencesUseCaseImpl.java
+│   ├── ListManualCurrencyRatesUseCaseImpl.java
+│   ├── ListUserSessionsUseCaseImpl.java
+│   ├── RefreshSessionUseCaseImpl.java
 │   ├── RegisterUserUseCaseImpl.java
-│   └── RefreshSessionUseCaseImpl.java
+│   ├── RevokeUserSessionUseCaseImpl.java
+│   ├── SetManualCurrencyRateUseCaseImpl.java
+│   ├── DeleteManualCurrencyRateUseCaseImpl.java
+│   ├── UpdateUserPasswordUseCaseImpl.java
+│   ├── UpdateUserProfileUseCaseImpl.java
+│   └── UpdateUserPreferencesUseCaseImpl.java
 ├── domain/
 │   ├── event/
 │   │   ├── DomainEvent.java
 │   │   ├── DomainEventPublisher.java
 │   │   └── UserRegisteredEvent.java
 │   ├── exception/
+│   │   ├── DomainError.java
 │   │   ├── DuplicateEmailException.java
 │   │   ├── InvalidCredentialsException.java
-│   │   └── UserNotFoundException.java
+│   │   ├── InvalidTokenException.java
+│   │   ├── SessionExpiredException.java
+│   │   ├── SessionNotFoundException.java
+│   │   ├── UserNotFoundException.java
+│   │   ├── WeakPasswordException.java
+│   │   └── WrongCurrentPasswordException.java
 │   ├── gateway/
 │   │   ├── AuthenticationProviderGateway.java
 │   │   └── PasswordHashGateway.java
 │   ├── model/
+│   │   ├── ManualCurrencyRate.java
 │   │   ├── Session.java
 │   │   ├── User.java
+│   │   ├── UserPreferences.java
+│   │   ├── UserSession.java
 │   │   └── valueObject/
+│   │       ├── DeviceLabel.java
+│   │       ├── InactivityPolicy.java
+│   │       ├── RefreshTokenClaims.java
+│   │       ├── RefreshTokenId.java
+│   │       ├── SessionId.java
 │   │       └── UserId.java
 │   ├── repository/
-│   │   └── UserRepository.java
+│   │   ├── ManualCurrencyRateRepository.java
+│   │   ├── UserPreferencesRepository.java
+│   │   ├── UserRepository.java
+│   │   └── UserSessionRepository.java
 │   └── usecase/
 │       ├── AuthenticateUserUseCase.java
+│       ├── DeleteManualCurrencyRateUseCase.java
+│       ├── GetUserPreferencesUseCase.java
+│       ├── ListManualCurrencyRatesUseCase.java
+│       ├── ListUserSessionsUseCase.java
 │       ├── RefreshSessionUseCase.java
 │       ├── RegisterUserUseCase.java
+│       ├── RevokeUserSessionUseCase.java
+│       ├── SetManualCurrencyRateUseCase.java
+│       ├── UpdateUserPasswordUseCase.java
+│       ├── UpdateUserProfileUseCase.java
+│       ├── UpdateUserPreferencesUseCase.java
 │       └── command/
 │           ├── AuthenticateUserCommand.java
+│           ├── DeleteManualCurrencyRateCommand.java
 │           ├── RefreshSessionCommand.java
-│           └── RegisterUserCommand.java
+│           ├── RegisterUserCommand.java
+│           ├── SetManualCurrencyRateCommand.java
+│           ├── UpdateUserPasswordCommand.java
+│           ├── UpdateUserProfileCommand.java
+│           └── UpdateUserPreferencesCommand.java
 ├── infrastructure/
 │   ├── config/
 │   │   ├── CsrfCookieFilter.java
@@ -60,29 +106,53 @@ back/ms-users/src/main/java/com/financialapp/users/
 │   │   ├── AuthenticationProviderGatewayImpl.java
 │   │   └── PasswordHashGatewayImpl.java
 │   ├── messaging/
-│   │   ├── DomainEventPublisherImpl.java   # routes domain events to the outbox
-│   │   ├── mapper/UserRegisteredEventMapper.java  # DomainEventMapper → OutboxRecord
-│   │   └── payload/                         # CloudEvent data records
+│   │   ├── DomainEventPublisherImpl.java
+│   │   ├── mapper/UserRegisteredEventMapper.java
+│   │   └── payload/
 │   │       └── UserRegisteredPayload.java
 │   └── persistence/
 │       ├── entity/
-│       │   └── UserJpaEntity.java
+│       │   ├── ManualCurrencyRateJpaEntity.java
+│       │   ├── UserJpaEntity.java
+│       │   ├── UserPreferencesJpaEntity.java
+│       │   └── UserSessionJpaEntity.java
 │       ├── jpa/
-│       │   └── UserJpaRepository.java
+│       │   ├── ManualCurrencyRateJpaRepository.java
+│       │   ├── UserJpaRepository.java
+│       │   ├── UserPreferencesJpaRepository.java
+│       │   └── UserSessionJpaRepository.java
 │       ├── mapper/
-│       │   └── UserPersistenceMapper.java
+│       │   ├── ManualCurrencyRatePersistenceMapper.java
+│       │   ├── UserPersistenceMapper.java
+│       │   ├── UserPreferencesPersistenceMapper.java
+│       │   └── UserSessionPersistenceMapper.java
 │       └── repository/
-│           └── UserRepositoryImpl.java
+│           ├── ManualCurrencyRateRepositoryImpl.java
+│           ├── UserRepositoryImpl.java
+│           ├── UserPreferencesRepositoryImpl.java
+│           └── UserSessionRepositoryImpl.java
 └── web/
     ├── CookieService.java
     ├── controller/
-    │   └── AuthController.java
+    │   ├── AuthController.java
+    │   ├── CurrencyRateController.java
+    │   ├── PreferenceController.java
+    │   ├── ProfileController.java
+    │   └── SessionController.java
     ├── dto/
     │   ├── request/
     │   │   ├── LoginRequest.java
-    │   │   └── RegisterRequest.java
+    │   │   ├── RegisterRequest.java
+    │   │   ├── SetManualCurrencyRateRequest.java
+    │   │   ├── UpdateUserPasswordRequest.java
+    │   │   ├── UpdateUserProfileRequest.java
+    │   │   └── UpdateUserPreferencesRequest.java
     │   └── response/
-    │       └── AuthResponse.java        (envelope ApiResponse comes from commons-core)
+    │       ├── AuthResponse.java
+    │       ├── ManualCurrencyRateResponse.java
+    │       ├── SessionResponse.java
+    │       ├── UserProfileResponse.java
+    │       └── UserPreferencesResponse.java
     └── error/
         └── GlobalExceptionHandler.java
 ```
@@ -91,125 +161,105 @@ back/ms-users/src/main/java/com/financialapp/users/
 
 ## Endpoints
 
-All routes under `/api/v1/auth`. The gateway's `JwtAuthFilter` marks this path prefix as exempt from JWT validation.
+All public auth routes live under `/api/v1/auth`. All authenticated user settings and session management routes live under `/api/v1/users/me/**` and resolve the user identity via the `X-User-Id` header injected by ms-gateway.
 
-All responses use the shared envelope `{ status, title, code, message, data }` from `commons-core`;
-`code` appears only on errors with the `DomainError` slug. `GlobalExceptionHandler extends
-ApiExceptionHandler` (commons-web); endpoints declare throwable codes with `@ApiErrorCodes`.
+All responses use the shared envelope `{ status, title, code, message, data }` from `commons-core`.
 
-| Method | Path | Request body | Success response | HTTP status |
-|--------|------|-------------|-----------------|------------|
-| `POST` | `/api/v1/auth/register` | `{ email, password (≥8), firstName, lastName }` | `ApiResponse<AuthResponse>` + 3 cookies set | `201 Created` |
-| `POST` | `/api/v1/auth/login` | `{ email, password }` | `ApiResponse<AuthResponse>` + 3 cookies set | `200 OK` |
-| `POST` | `/api/v1/auth/refresh` | — (reads `refresh_token` cookie) | `ApiResponse<AuthResponse>` + 3 cookies refreshed | `200 OK` |
-| `POST` | `/api/v1/auth/logout` | — | `ApiResponse<Void>` + 3 cookies zeroed (maxAge=0) | `200 OK` |
+### Auth Endpoints (`/api/v1/auth`)
 
-`AuthResponse` fields: `userId`, `email`, `firstName`, `lastName`.
+| Method | Path | Request body / Headers | Success response | HTTP status |
+|--------|------|-----------------------|-----------------|------------|
+| `POST` | `/api/v1/auth/register` | `{ email, password (≥8), firstName, lastName, rememberMe? }` + `User-Agent` | `ApiResponse<AuthResponse>` + 3 cookies set | `201 Created` |
+| `POST` | `/api/v1/auth/login` | `{ email, password, rememberMe? }` + `User-Agent` | `ApiResponse<AuthResponse>` + 3 cookies set | `200 OK` |
+| `POST` | `/api/v1/auth/refresh` | Reads `refresh_token` cookie + `User-Agent` | `ApiResponse<AuthResponse>` + 3 cookies refreshed | `200 OK` |
+| `POST` | `/api/v1/auth/logout` | Reads `refresh_token` cookie (revokes server-side) | `ApiResponse<Void>` + 3 cookies zeroed | `200 OK` |
 
-### Error responses
+### User Settings & Session Endpoints (`/api/v1/users/me`)
 
-| Scenario | HTTP status | `code` |
-|----------|------------|--------|
-| Email already exists | `409 Conflict` | `email_already_registered` |
-| Wrong email or password | `401 Unauthorized` | `invalid_credentials` |
-| Invalid / expired JWT | `401 Unauthorized` | `invalid_token` |
-| Missing `refresh_token` cookie | `401 Unauthorized` | `authentication_required` |
-| User not found during refresh | `404 Not Found` | `user_not_found` |
-| Bean validation failure | `400 Bad Request` | `validation_error` (field map in `data`) |
+| Method | Path | Headers / Body | Success response | HTTP status |
+|--------|------|---------------|-----------------|------------|
+| `GET` | `/api/v1/users/me/sessions` | `X-User-Id`, `access_token` cookie | `ApiResponse<List<SessionResponse>>` | `200 OK` |
+| `DELETE` | `/api/v1/users/me/sessions/{id}` | `X-User-Id` | `ApiResponse<Void>` | `200 OK` |
+| `GET` | `/api/v1/users/me/preferences` | `X-User-Id` | `ApiResponse<UserPreferencesResponse>` | `200 OK` |
+| `PUT` | `/api/v1/users/me/preferences` | `X-User-Id`, `{ maxIdleMinutes, timezone, primaryCurrency, secondaryCurrency, numberFormat, decimals, colorForAmounts }` | `ApiResponse<UserPreferencesResponse>` | `200 OK` |
+| `GET` | `/api/v1/users/me/currency-rates` | `X-User-Id` | `ApiResponse<List<ManualCurrencyRateResponse>>` | `200 OK` |
+| `PUT` | `/api/v1/users/me/currency-rates/{currency}` | `X-User-Id`, `{ ratePerArs }` | `ApiResponse<ManualCurrencyRateResponse>` | `200 OK` |
+| `DELETE` | `/api/v1/users/me/currency-rates/{currency}` | `X-User-Id` | `ApiResponse<Void>` | `200 OK` |
+| `PUT` | `/api/v1/users/me/profile` | `X-User-Id`, `{ firstName, lastName }` | `ApiResponse<UserProfileResponse>` | `200 OK` |
+| `PUT` | `/api/v1/users/me/password` | `X-User-Id`, `access_token` cookie, `{ currentPassword, newPassword (≥8) }` | `ApiResponse<Void>` | `200 OK` |
 
 ---
 
-## JWT
+## JWT & Token Claims
 
 | Property | Value |
 |----------|-------|
-| Algorithm | HMAC-SHA (key via `Keys.hmacShaKeyFor`) |
-| Key source | `jwt.secret` env var — raw UTF-8 bytes |
-| Access token TTL | `jwt.expiration` ms (default **86 400 000 ms = 24 h**) |
-| Refresh token TTL | `jwt.refresh-expiration` ms (default **604 800 000 ms = 7 d**) |
-| Access token claims | `sub` (userId), `email`, `firstName`, `iat`, `exp` |
-| Refresh token claims | `sub` (userId), `type: "refresh"`, `iat`, `exp` |
-| Library | `io.jsonwebtoken` (JJWT) |
+| Algorithm | HMAC-SHA (`Keys.hmacShaKeyFor`) |
+| Key source | `jwt.secret` env var |
+| Access token TTL | `jwt.expiration` ms (default 24 h) |
+| Refresh token TTL | `jwt.refresh-expiration` ms (default 7 d; 30 d when `rememberMe=true`) |
+| Access token claims | `{ sub, email, firstName, type: "access", sid: <sessionId>, iat, exp }` |
+| Refresh token claims | `{ sub, type: "refresh", jti: <uuid>, iat, exp }` |
 
-`JwtProperties` is a `@ConfigurationProperties(prefix = "jwt")` bean. `AuthenticationProviderGatewayImpl` builds the `SecretKey` once at construction time.
-
----
-
-## Cookies
-
-All cookies use `SameSite=Lax`. `Secure` is driven by the `app.cookie.secure` property (false in local dev, true in production).
-
-| Cookie | HttpOnly | Path | Max-Age | Value |
-|--------|----------|------|---------|-------|
-| `access_token` | Yes | `/api` | 24 h | Signed JWT (access) |
-| `refresh_token` | Yes | `/api/v1/auth/refresh` | 7 d | Signed JWT (refresh) |
-| `user_info` | **No** | `/` | 24 h | `id\|email\|firstName+lastName` URL-encoded |
-| `XSRF-TOKEN` | **No** | `/` | session | CSRF token set by Spring Security |
-
-`user_info` is the only cookie readable by JavaScript; the Next.js middleware uses it to gate dashboard routes without an extra network call.
-
-On logout all three application cookies are reissued with `maxAge=0`, effectively deleting them.
+Verification strictly enforces `type == "access"` on access-token paths and `type == "refresh"` + matching `jti` on refresh paths. Tokens lacking `type` are rejected on both paths.
 
 ---
 
-## CSRF
-
-Spring Security 6 defers CSRF token materialisation until the token is first read. `CsrfCookieFilter` (inserted after `BasicAuthenticationFilter`) forces `csrfToken.getToken()` on every request so the `XSRF-TOKEN` cookie is always written to the response.
-
-Flow:
-
-1. Spring sets `XSRF-TOKEN` cookie (readable by JS, `HttpOnly=false`).
-2. Frontend reads the cookie and sends its value as the `X-XSRF-TOKEN` request header on every `POST`/`PUT`/`DELETE`.
-3. Spring validates header vs stored token.
-4. All `/api/v1/auth/**` paths are exempt via `csrf.ignoringRequestMatchers`.
-
----
-
-## Password hashing
-
-`BCryptPasswordEncoder` is the `PasswordEncoder` bean (default strength 10). `PasswordHashGatewayImpl` delegates to it. Passwords are hashed at registration time; plain-text passwords never persist.
-
----
-
-## Internal auth
-
-`InternalAuthFilter` requires an `X-Internal-Token` header on all non-public paths (actuator, swagger, and api-docs are excluded). This prevents direct HTTP calls to ms-users from bypassing the gateway.
-
----
-
-## Domain model
-
-### User entity
+## Domain Model & Schema
 
 ```mermaid
 erDiagram
-    USER {
+    USERS ||--o{ USER_SESSIONS : owns
+    USERS ||--o| USER_PREFERENCES : has
+    USERS ||--o{ MANUAL_CURRENCY_RATES : configures
+
+    USERS {
         Long id PK
         String email
         String password
         String firstName
         String lastName
-        LocalDateTime createdAt
-        LocalDateTime updatedAt
+    }
+
+    USER_SESSIONS {
+        Long id PK
+        Long user_id FK
+        UUID refresh_token_id UK
+        String device
+        Boolean remember_me
+        Boolean revoked
+        LocalDateTime created_at
+        LocalDateTime last_seen_at
+    }
+
+    USER_PREFERENCES {
+        Long user_id PK_FK
+        Int max_idle_minutes
+        String timezone
+        String primary_currency
+        String secondary_currency
+        String number_format
+        Int decimals
+        Boolean color_for_amounts
+    }
+
+    MANUAL_CURRENCY_RATES {
+        Long id PK
+        Long user_id FK
+        String currency
+        BigDecimal rate_per_ars
     }
 ```
 
-DB table: `users.users`. `email` has a `UNIQUE` constraint. All timestamp columns are `TIMESTAMPTZ DEFAULT now()`.
+### Manual Currency Rate Invariants
 
-### Session value object
-
-`Session` is a transient record (never persisted) returned by every use case and consumed by `AuthController` to build the cookie headers:
-
-```
-Session
-  user               : User
-  accessAuthentication  : String   (access JWT)
-  refreshAuthentication : String   (refresh JWT)
-```
+- Rates are stored for non-ARS and non-USD ISO currencies (ARS and USD use automatic exchange paths).
+- `rate_per_ars` is strictly positive (`1 <currency> = rate_per_ars ARS`).
+- Unique per `(user_id, currency)` pair with upsert semantics.
 
 ---
 
-## Login sequence
+## Refresh Sequence with Session Validation
 
 ```mermaid
 sequenceDiagram
@@ -218,76 +268,44 @@ sequenceDiagram
     participant ms-users
     participant PostgreSQL
 
-    Browser->>Gateway: POST /api/v1/auth/login { email, password }
-    Gateway->>ms-users: forward (auth path — JWT filter exempt)
-    ms-users->>PostgreSQL: SELECT * FROM users.users WHERE email = ?
-    PostgreSQL-->>ms-users: UserJpaEntity
-    ms-users->>ms-users: BCrypt.matches(rawPassword, hash)
-    ms-users->>ms-users: sign access JWT (24 h)
-    ms-users->>ms-users: sign refresh JWT (7 d)
-    ms-users-->>Gateway: 200 OK + Set-Cookie: access_token, refresh_token, user_info
-    Gateway-->>Browser: 200 OK + cookies forwarded
-    Note over Browser: access_token & refresh_token are HttpOnly<br/>user_info is readable by Next.js middleware
+    Browser->>Gateway: POST /api/v1/auth/refresh (refresh_token cookie)
+    Gateway->>ms-users: forward request
+    ms-users->>ms-users: verify signature + type=="refresh" + extract (userId, jti)
+    ms-users->>PostgreSQL: SELECT * FROM user_sessions WHERE refresh_token_id = jti
+    PostgreSQL-->>ms-users: UserSession
+    alt Session revoked or missing
+        ms-users-->>Browser: 401 Unauthorized (invalid_token)
+    end
+    ms-users->>PostgreSQL: SELECT * FROM user_preferences WHERE user_id = userId
+    PostgreSQL-->>ms-users: UserPreferences
+    alt now - lastSeenAt > maxIdleMinutes
+        ms-users->>PostgreSQL: UPDATE user_sessions SET revoked = true
+        ms-users-->>Browser: 401 Unauthorized (session expired)
+    end
+    ms-users->>ms-users: rotate jti + touch lastSeenAt
+    ms-users->>PostgreSQL: UPDATE user_sessions SET refresh_token_id = newJti, last_seen_at = now
+    ms-users->>ms-users: mint new access JWT (with sid) + new refresh JWT (with newJti)
+    ms-users-->>Browser: 200 OK + updated cookies
 ```
 
 ---
 
-## Registration sequence
-
-```mermaid
-sequenceDiagram
-    participant Browser
-    participant ms-users
-    participant PostgreSQL
-    participant Kafka
-
-    Browser->>ms-users: POST /api/v1/auth/register { email, password, firstName, lastName }
-    ms-users->>PostgreSQL: SELECT email (duplicate check)
-    PostgreSQL-->>ms-users: empty
-    ms-users->>ms-users: BCrypt.hash(password)
-    ms-users->>PostgreSQL: INSERT INTO users.users
-    PostgreSQL-->>ms-users: saved User (id assigned)
-    ms-users->>Kafka: users.user.registered (CloudEvent, via outbox relay)
-    ms-users->>ms-users: sign access + refresh JWTs
-    ms-users-->>Browser: 201 Created + 3 cookies + AuthResponse
-```
-
----
-
-## Refresh sequence
-
-```mermaid
-sequenceDiagram
-    participant Browser
-    participant ms-users
-    participant PostgreSQL
-
-    Browser->>ms-users: POST /api/v1/auth/refresh (refresh_token cookie auto-sent)
-    ms-users->>ms-users: parse refresh JWT → extract UserId
-    ms-users->>PostgreSQL: SELECT * FROM users.users WHERE id = ?
-    PostgreSQL-->>ms-users: User
-    ms-users->>ms-users: sign new access JWT + new refresh JWT
-    ms-users-->>Browser: 200 OK + 3 new cookies
-```
-
----
-
-## Flyway migrations
+## Flyway Migrations
 
 | Version | File | Description |
 |---------|------|-------------|
 | V1 | `V1__init.sql` | Creates `users.users` table with BIGSERIAL PK, UNIQUE email, bcrypt password, names, timestamps |
+| V2 | `V2__create_outbox_event.sql` | Creates `users.outbox_event` table for transactional domain event publishing |
+| V3 | `V3__create_user_sessions.sql` | Creates `users.user_sessions` table with UNIQUE `refresh_token_id` UUID, device, remember_me, last_seen_at, revoked |
+| V4 | `V4__create_user_preferences.sql` | Creates `users.user_preferences` table storing max_idle_minutes, timezone, primary/secondary currency, number format, decimals, and color_for_amounts |
+| V5 | `V5__create_manual_currency_rates.sql` | Creates `users.manual_currency_rates` table for per-user manual FX conversion rates (UNIQUE on `user_id, currency`) |
 
 ---
 
 ## CI/CD
 
-Thin caller workflows (`.github/workflows/`) delegate to the shared workflows in the root repo:
-`ci.yml` (PRs + develop/master pushes → `mvn verify` + Docker build; required check `ci / build`),
-`docker-publish.yml` (master push / `v*` tag → GHCR `latest` + `sha-*` + semver),
-`release.yml` (bump dropdown → semver release). Tests must pass without local infra — CI runs on a
-bare runner; integration tests use H2 and `EmbeddedKafka` where needed.
-See [../workflow.md](../workflow.md) § CI/CD.
+Thin caller workflows (`.github/workflows/`) delegate to shared workflows in root repo:
+`ci.yml` (`mvn verify` + Docker build), `docker-publish.yml`, `release.yml`. Tests pass without local infra — integration tests use H2 and `EmbeddedKafka` where needed.
 
 ---
 
