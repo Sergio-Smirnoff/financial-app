@@ -10,8 +10,8 @@ transcribed by hand. Every row must reach `Verified: yes` before Task 11 deletes
 |---|---|---|---|---|
 | `CLAUDE.md` | 1-14 | # CLAUDE.md — financial-app (parent / root) | AGENTS.md (identity + polyrepo one-liner) | no |
 | `CLAUDE.md` | 15-33 | ## 0. Read-before-plan (mandatory, in order) | WORKFLOW.md, folded into the four modes | no |
-| `CLAUDE.md` | 34-54 | ## 1. Does this file work for other AI tools? | ARCHITECTURE.md § AI context layer | no |
-| `CLAUDE.md` | 55-86 | ## 2. System map | ARCHITECTURE.md | no |
+| `CLAUDE.md` | 34-54 | ## 1. Does this file work for other AI tools? | ARCHITECTURE.md § AI context layer | yes |
+| `CLAUDE.md` | 55-86 | ## 2. System map | ARCHITECTURE.md | yes |
 | `CLAUDE.md` | 87-122 | ## 3. Domain model catalog (bird's-eye — see each service spec for full ER diagrams) | DROPPED (P2) | no |
 | `CLAUDE.md` | 123-174 | ## 4. DDD layering (every backend service, identical shape) | split: layering prose → `.ai/skills/ddd/SKILL.md`; package tree → `.ai/references/APP_STRUCTURE.md` | yes |
 | `CLAUDE.md` | 175-207 | ## 5. Naming conventions | RULES.md R7 | yes |
@@ -51,11 +51,11 @@ transcribed by hand. Every row must reach `Verified: yes` before Task 11 deletes
 | `docs/specs/workflow.md` | 59-71 | ## Update-Docs-After-Implementation | RULES.md R18 | no |
 | `docs/specs/workflow.md` | 72-84 | ## Per-Repo Commit Targets | WORKFLOW.md + RULES.md | no |
 | `docs/specs/workflow.md` | 85-135 | ## CI/CD | PIPELINE.md | no |
-| `docs/specs/architecture.md` | 1-6 | # Architecture | ARCHITECTURE.md (header) | no |
-| `docs/specs/architecture.md` | 7-51 | ## 1. Polyrepo topology | ARCHITECTURE.md | no |
-| `docs/specs/architecture.md` | 52-82 | ## 2. Runtime topology | ARCHITECTURE.md | no |
+| `docs/specs/architecture.md` | 1-6 | # Architecture | ARCHITECTURE.md (header) | yes |
+| `docs/specs/architecture.md` | 7-51 | ## 1. Polyrepo topology | ARCHITECTURE.md | yes |
+| `docs/specs/architecture.md` | 52-82 | ## 2. Runtime topology | ARCHITECTURE.md | yes |
 | `docs/specs/architecture.md` | 83-122 | ## 3. Auth / cookie / CSRF flow | APP_STRUCTURE.md | yes |
-| `docs/specs/architecture.md` | 123-141 | ## 4. Data stores | ARCHITECTURE.md | no |
+| `docs/specs/architecture.md` | 123-141 | ## 4. Data stores | ARCHITECTURE.md | yes |
 | `docs/specs/architecture.md` | 142-163 | ## 5. DDD layering | skills/ddd | yes |
 | `docs/specs/architecture.md` | 164-182 | ## 6. CI/CD | PIPELINE.md | no |
 | `docs/specs/deployment.md` | 1-2 | # Deployment & Dev-Ops | DEPLOYMENT.md (header) | no |

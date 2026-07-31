@@ -3,6 +3,9 @@
 # Usage: scripts/ai-link.sh [--check]
 #   (no args)  create or refresh every link
 #   --check    verify only, exit 1 if any link is wrong or missing
+# Auto-loading a context file is a convention each tool implements, not a guarantee.
+# To support a tool that reads a different filename, add an entry to LINKS below --
+# never fork the content. A tool with no auto-load convention needs a manual paste.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
