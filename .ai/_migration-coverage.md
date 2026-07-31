@@ -9,7 +9,7 @@ transcribed by hand. Every row must reach `Verified: yes` before Task 11 deletes
 | Source | Lines | Heading | Destination | Verified |
 |---|---|---|---|---|
 | `CLAUDE.md` | 1-14 | # CLAUDE.md — financial-app (parent / root) | AGENTS.md (identity + polyrepo one-liner) | no |
-| `CLAUDE.md` | 15-33 | ## 0. Read-before-plan (mandatory, in order) | WORKFLOW.md, folded into the four modes | no |
+| `CLAUDE.md` | 15-33 | ## 0. Read-before-plan (mandatory, in order) | WORKFLOW.md, folded into the four modes | yes |
 | `CLAUDE.md` | 34-54 | ## 1. Does this file work for other AI tools? | ARCHITECTURE.md § AI context layer | yes |
 | `CLAUDE.md` | 55-86 | ## 2. System map | ARCHITECTURE.md | yes |
 | `CLAUDE.md` | 87-122 | ## 3. Domain model catalog (bird's-eye — see each service spec for full ER diagrams) | DROPPED (P2) | no |
@@ -42,14 +42,14 @@ transcribed by hand. Every row must reach `Verified: yes` before Task 11 deletes
 | `docs/specs/rules.md` | 241-252 | ### Config source | APP_STRUCTURE.md | yes |
 | `docs/specs/rules.md` | 253-269 | ## 9. CI / CD Constraints | split: the two hard bans → `RULES.md` R16–R17; remainder → `PIPELINE.md` | no |
 | `docs/specs/rules.md` | 270-272 | ## Footer | DROPPED (navigation only) | no |
-| `docs/specs/workflow.md` | 1-2 | # Development Workflow | WORKFLOW.md (header) | no |
-| `docs/specs/workflow.md` | 3-6 | ## Branching Strategy | WORKFLOW.md + RULES.md | no |
-| `docs/specs/workflow.md` | 7-14 | ### Branch model | WORKFLOW.md + RULES.md | no |
-| `docs/specs/workflow.md` | 15-34 | ### Flow | WORKFLOW.md + RULES.md | no |
+| `docs/specs/workflow.md` | 1-2 | # Development Workflow | WORKFLOW.md (header) | yes |
+| `docs/specs/workflow.md` | 3-6 | ## Branching Strategy | WORKFLOW.md + RULES.md | yes |
+| `docs/specs/workflow.md` | 7-14 | ### Branch model | WORKFLOW.md + RULES.md | yes |
+| `docs/specs/workflow.md` | 15-34 | ### Flow | WORKFLOW.md + RULES.md | yes |
 | `docs/specs/workflow.md` | 35-43 | ## Commit Rules | `RULES.md` R14 | yes |
-| `docs/specs/workflow.md` | 44-58 | ## Read-Before-Plan | WORKFLOW.md, folded into the four modes | no |
-| `docs/specs/workflow.md` | 59-71 | ## Update-Docs-After-Implementation | RULES.md R18 | no |
-| `docs/specs/workflow.md` | 72-84 | ## Per-Repo Commit Targets | WORKFLOW.md + RULES.md | no |
+| `docs/specs/workflow.md` | 44-58 | ## Read-Before-Plan | WORKFLOW.md, folded into the four modes | yes |
+| `docs/specs/workflow.md` | 59-71 | ## Update-Docs-After-Implementation | RULES.md R18 | yes |
+| `docs/specs/workflow.md` | 72-84 | ## Per-Repo Commit Targets | WORKFLOW.md + RULES.md | yes |
 | `docs/specs/workflow.md` | 85-135 | ## CI/CD | PIPELINE.md | no |
 | `docs/specs/architecture.md` | 1-6 | # Architecture | ARCHITECTURE.md (header) | yes |
 | `docs/specs/architecture.md` | 7-51 | ## 1. Polyrepo topology | ARCHITECTURE.md | yes |
