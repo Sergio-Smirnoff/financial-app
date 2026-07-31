@@ -192,6 +192,24 @@ refreshes.
 | Lombok for boilerplate | `@Getter`, `@Builder`, `@RequiredArgsConstructor`, etc. via Lombok. No hand-written getters/setters. |
 | `@Transactional` in service layer | Transaction boundaries are declared on service-layer methods, never on controllers or persistence adapters. |
 
+## Shared value objects
+
+These four concepts recur across services. **Each service defines its own copy — there is no
+shared domain library, and creating one is not an accepted refactor.** Only `commons-core`,
+`commons-web` and `commons-messaging` are shared, and those are framework plumbing, not domain
+concepts. `commons-core` carries zero-behavior vocabulary types only (`IvaTreatment`,
+`PageResult<T>`); a VO with behavior stays inside each service that needs it.
+
+| VO | Rule |
+| :-- | :-- |
+| `Money` | `BigDecimal` amount + `java.util.Currency`. Always a positive magnitude — direction is expressed by the surrounding concept, never by a negative amount. |
+| `Cbu` | 22-digit Argentine CBU, validated with BCRA check digits in the constructor. |
+| `BankNumber` | 3-digit BCRA bank code. |
+| `UserId` | Identity of the authenticated user, injected downstream by the gateway as `X-User-Id`. |
+
+Per-service aggregates, entities and enums are documented in that service's own reference, not
+here. Duplicating a service's model into a central file guarantees the two drift.
+
 ## Configuration
 
 | Rule | Detail |

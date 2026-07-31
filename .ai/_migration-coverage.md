@@ -8,10 +8,14 @@ transcribed by hand. Every row must reach `Verified: yes` before Task 11 deletes
 
 `Verified: yes` means one of two things. For a row with a real destination, the content is
 present at that destination and was checked there. For a `DROPPED (…)` row it means the drop
-was confirmed deliberate — the three such rows are `CLAUDE.md` §3 (the domain-model catalog,
-deferred to P2) and the two `## Footer` blocks (navigation links to files being deleted).
-The catalog is the one genuine content loss in P1; it is recorded in spec §13 and is P2's
-first input.
+was confirmed deliberate — the only two such rows are the `## Footer` blocks, which are
+navigation links to files being deleted.
+
+The domain-model catalog was originally marked a P1 content loss. It is not: every per-service
+model it summarised is already documented at greater depth in `docs/specs/services/*.md`, which
+P1 does not delete. Its one non-duplicated part — the shared value objects and the rule that no
+shared domain library exists — was moved into `APP_STRUCTURE.md`. P2 distils the per-service
+half into `.ai/services/<svc>.md`.
 
 | Source | Lines | Heading | Destination | Verified |
 |---|---|---|---|---|
@@ -19,7 +23,7 @@ first input.
 | `CLAUDE.md` | 15-33 | ## 0. Read-before-plan (mandatory, in order) | WORKFLOW.md, folded into the four modes | yes |
 | `CLAUDE.md` | 34-54 | ## 1. Does this file work for other AI tools? | ARCHITECTURE.md § AI context layer | yes |
 | `CLAUDE.md` | 55-86 | ## 2. System map | ARCHITECTURE.md | yes |
-| `CLAUDE.md` | 87-122 | ## 3. Domain model catalog (bird's-eye — see each service spec for full ER diagrams) | DROPPED (P2) | yes |
+| `CLAUDE.md` | 87-122 | ## 3. Domain model catalog (bird's-eye — see each service spec for full ER diagrams) | split: shared VOs + no-shared-domain-library rule → `APP_STRUCTURE.md` § Shared value objects; per-service models → `.ai/services/<svc>.md` (P2), distilled from the surviving `docs/specs/services/*.md` | yes |
 | `CLAUDE.md` | 123-174 | ## 4. DDD layering (every backend service, identical shape) | split: layering prose → `.ai/skills/ddd/SKILL.md`; package tree → `.ai/references/APP_STRUCTURE.md` | yes |
 | `CLAUDE.md` | 175-207 | ## 5. Naming conventions | RULES.md R7 | yes |
 | `CLAUDE.md` | 208-221 | ## 6. Response envelope (every endpoint, every service) | APP_STRUCTURE.md | yes |
