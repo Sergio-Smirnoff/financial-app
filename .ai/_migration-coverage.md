@@ -14,11 +14,11 @@ transcribed by hand. Every row must reach `Verified: yes` before Task 11 deletes
 | `CLAUDE.md` | 55-86 | ## 2. System map | ARCHITECTURE.md | no |
 | `CLAUDE.md` | 87-122 | ## 3. Domain model catalog (bird's-eye — see each service spec for full ER diagrams) | DROPPED (P2) | no |
 | `CLAUDE.md` | 123-174 | ## 4. DDD layering (every backend service, identical shape) | split: layering prose → `.ai/skills/ddd/SKILL.md`; package tree → `.ai/references/APP_STRUCTURE.md` | yes |
-| `CLAUDE.md` | 175-207 | ## 5. Naming conventions | RULES.md R7 | no |
+| `CLAUDE.md` | 175-207 | ## 5. Naming conventions | RULES.md R7 | yes |
 | `CLAUDE.md` | 208-221 | ## 6. Response envelope (every endpoint, every service) | APP_STRUCTURE.md | yes |
-| `CLAUDE.md` | 222-236 | ## 7. Comment policy | RULES.md R9 | no |
+| `CLAUDE.md` | 222-236 | ## 7. Comment policy | RULES.md R9 | yes |
 | `CLAUDE.md` | 237-255 | ## 8. Git / workflow rules (apply everywhere, every repo) | RULES.md R11–R14 + WORKFLOW.md + PIPELINE.md | no |
-| `CLAUDE.md` | 256-263 | ## 9. Approval before destructive changes | RULES.md R15 | no |
+| `CLAUDE.md` | 256-263 | ## 9. Approval before destructive changes | RULES.md R15 | yes |
 | `CLAUDE.md` | 264-268 | ## Footer | DROPPED (navigation only) | no |
 | `docs/specs/rules.md` | 1-6 | # Implementation Rules | RULES.md (header) | no |
 | `docs/specs/rules.md` | 7-23 | ## 1. DDD Always | skills/ddd | yes |
@@ -36,7 +36,7 @@ transcribed by hand. Every row must reach `Verified: yes` before Task 11 deletes
 | `docs/specs/rules.md` | 177-182 | ### 4.5 Catch order | APP_STRUCTURE.md | yes |
 | `docs/specs/rules.md` | 183-194 | ## 5. Configuration | APP_STRUCTURE.md | yes |
 | `docs/specs/rules.md` | 195-206 | ## 6. Persistence | APP_STRUCTURE.md | yes |
-| `docs/specs/rules.md` | 207-220 | ## 7. Code Comments | RULES.md R9 | no |
+| `docs/specs/rules.md` | 207-220 | ## 7. Code Comments | RULES.md R9 | yes |
 | `docs/specs/rules.md` | 221-233 | ## 8. Supported Currencies | APP_STRUCTURE.md | yes |
 | `docs/specs/rules.md` | 234-240 | ### Currency type rules | APP_STRUCTURE.md | yes |
 | `docs/specs/rules.md` | 241-252 | ### Config source | APP_STRUCTURE.md | yes |
@@ -46,7 +46,7 @@ transcribed by hand. Every row must reach `Verified: yes` before Task 11 deletes
 | `docs/specs/workflow.md` | 3-6 | ## Branching Strategy | WORKFLOW.md + RULES.md | no |
 | `docs/specs/workflow.md` | 7-14 | ### Branch model | WORKFLOW.md + RULES.md | no |
 | `docs/specs/workflow.md` | 15-34 | ### Flow | WORKFLOW.md + RULES.md | no |
-| `docs/specs/workflow.md` | 35-43 | ## Commit Rules | `RULES.md` R14 | no |
+| `docs/specs/workflow.md` | 35-43 | ## Commit Rules | `RULES.md` R14 | yes |
 | `docs/specs/workflow.md` | 44-58 | ## Read-Before-Plan | WORKFLOW.md, folded into the four modes | no |
 | `docs/specs/workflow.md` | 59-71 | ## Update-Docs-After-Implementation | RULES.md R18 | no |
 | `docs/specs/workflow.md` | 72-84 | ## Per-Repo Commit Targets | WORKFLOW.md + RULES.md | no |
