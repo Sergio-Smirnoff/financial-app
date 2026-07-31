@@ -1,7 +1,8 @@
 # Getting Started — financial-app
 
 Welcome to the project. This guide gets you from zero to a running local stack in one sitting.
-For deep architectural reference see [`docs/specs/00-master.md`](specs/00-master.md).
+For deep architectural reference see [`.ai/AGENTS.md`](../.ai/AGENTS.md) and the
+references it indexes.
 
 ---
 
@@ -15,7 +16,7 @@ service source code:
 | Docker Compose files | `docker-compose.yml` (prod canonical + monitoring), `docker-compose.override.yml` (dev host-port overlay) |
 | Dev/deploy scripts | `scripts/dev.sh`, `scripts/deploy.sh` |
 | Infrastructure config | `infra/postgres/init/`, `infra/kafka/` |
-| Documentation | `docs/` |
+| Documentation | `docs/` (human-readable), `.ai/` (agent context) |
 | Environment template | `.env.example` |
 
 Every microservice and the frontend is a **separate git repository** that must be cloned
@@ -55,8 +56,9 @@ financial-app/                          ← parent repo (this one)
 │   └── deploy.sh
 ├── infra/
 │   └── postgres/init/
+├── .ai/                                ← agent context (see scripts/ai-link.sh)
 ├── docs/
-│   └── specs/00-master.md
+│   └── GETTING-STARTED.md
 ├── back/
 │   ├── financial-app-parent/           ← Maven BOM repo
 │   ├── ms-gateway/                     ← :8080
@@ -155,7 +157,17 @@ Key variable groups you must review before first run:
    cd financial-app
    ```
 
-2. **Clone each service repo into its slot**
+2. **Wire up the AI context files**
+
+   ```bash
+   ./scripts/ai-link.sh
+   ```
+
+   Creates `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.mcp.json` and `.claude/` as symlinks into
+   the tracked `.ai/` directory. They are gitignored, so a fresh clone has none of them until
+   you run this. Safe to re-run at any time.
+
+3. **Clone each service repo into its slot**
 
    ```bash
    git clone git@github.com:Sergio-Smirnoff/financial-app-back-financial-app-parent.git back/financial-app-parent
@@ -169,20 +181,20 @@ Key variable groups you must review before first run:
    git clone git@github.com:Sergio-Smirnoff/financial-app-front-financial-app.git       front/financial-app
    ```
 
-3. **Set up your `.env`**
+4. **Set up your `.env`**
 
    ```bash
    cp .env.example .env
    # Open .env and set POSTGRES_PASSWORD, JWT_SECRET, and INTERNAL_AUTH_TOKEN at minimum
    ```
 
-4. **Install frontend dependencies** (only needed once, or after `package.json` changes)
+5. **Install frontend dependencies** (only needed once, or after `package.json` changes)
 
    ```bash
    cd front/financial-app && npm install && cd ../..
    ```
 
-5. **Start the full stack**
+6. **Start the full stack**
 
    ```bash
    ./scripts/dev.sh local-all --front
@@ -191,7 +203,7 @@ Key variable groups you must review before first run:
    The script starts PostgreSQL, Kafka, MinIO, all backend services (Maven, hot-reload), and
    the Next.js dev server. The first Maven build takes a few minutes; subsequent starts are faster.
 
-6. **Verify**
+7. **Verify**
 
    - App: http://localhost:3000
    - Aggregated Swagger: http://localhost:8080/swagger-ui.html
@@ -216,5 +228,5 @@ Key variable groups you must review before first run:
 
 ## 6. Deep reference
 
-Full architecture, domain models, ADRs, and service contracts are in
-[`docs/specs/00-master.md`](specs/00-master.md).
+Full architecture, rules, workflow and deployment references are indexed from
+[`.ai/AGENTS.md`](../.ai/AGENTS.md). Service contracts live in `docs/specs/services/`.

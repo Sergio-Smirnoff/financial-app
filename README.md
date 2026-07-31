@@ -50,14 +50,14 @@ financial-app/                          ← parent repo (this one)
 │   └── github/                         ← CI/CD ops: apply-rulesets, release, promote, fetch-failure-logs
 ├── infra/
 │   └── postgres/init/                  ← one-time schema bootstrap SQL
+├── .ai/                                ← agent context, canonical (scripts/ai-link.sh)
+│   ├── AGENTS.md                       ← entry point + reference index
+│   ├── references/                     ← RULES, ARCHITECTURE, WORKFLOW, TECH_STACK, …
+│   └── skills/                         ← ddd, solid
 ├── docs/
 │   ├── GETTING-STARTED.md
 │   └── specs/
-│       ├── 00-master.md                ← documentation hub
-│       ├── architecture.md
-│       ├── rules.md
-│       ├── workflow.md
-│       ├── deployment.md
+│       ├── IDEAS.md                    ← known bugs, gaps, tech debt
 │       └── services/
 │           ├── ms-gateway.md
 │           ├── ms-users.md
@@ -185,15 +185,16 @@ Branch rulesets in `.github/rulesets/` (apply with `scripts/github/apply-ruleset
 Promote + release (interactive, parallel, parent-first): `scripts/github/release-manager.sh`
 (`promote` = develop→master PR + wait + merge; `release` = dispatch vX.Y.Z). Run with no args for the menu.
 Failing-run logs: `scripts/github/fetch-failure-logs.sh` (downloads to `/tmp/ci-logs/`).
-See `docs/specs/workflow.md` § CI/CD.
+See `.ai/references/PIPELINE.md`.
 
 ## Documentation
 
 | Document | Description |
 |---|---|
-| [docs/specs/00-master.md](docs/specs/00-master.md) | Documentation hub — index of all specs |
-| [docs/specs/architecture.md](docs/specs/architecture.md) | Polyrepo topology, runtime flow, auth/cookie/CSRF sequence, data stores, DDD layering |
-| [docs/specs/rules.md](docs/specs/rules.md) | Coding conventions and DDD rules |
-| [docs/specs/workflow.md](docs/specs/workflow.md) | Git workflow and branching strategy |
-| [docs/specs/deployment.md](docs/specs/deployment.md) | Docker and production deployment reference |
+| [.ai/AGENTS.md](.ai/AGENTS.md) | Entry point and reference index — start here |
+| [.ai/references/ARCHITECTURE.md](.ai/references/ARCHITECTURE.md) | Polyrepo topology, runtime flow, data stores, AI context layer |
+| [.ai/references/RULES.md](.ai/references/RULES.md) | Coding conventions and DDD rules (R1–R18) |
+| [.ai/references/WORKFLOW.md](.ai/references/WORKFLOW.md) | The four workflow modes, branching, commits |
+| [.ai/references/DEPLOYMENT.md](.ai/references/DEPLOYMENT.md) | Docker and production deployment reference |
+| [.ai/references/APP_STRUCTURE.md](.ai/references/APP_STRUCTURE.md) | Envelope, exception hierarchy, auth, persistence patterns |
 | [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) | Full setup guide — cloning all repos, env config, first run |
