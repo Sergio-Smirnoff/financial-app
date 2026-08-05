@@ -111,6 +111,7 @@ fix the root cause instead. `-DskipTests` still compiles tests, so stale test co
 breaks Docker builds too.
 
 ### R18 — Update the reference and the README after implementing
-Every implementation updates that service's reference under `.ai/services/` **and**
-that repo's `README.md`. One is the system-wide design record, the other is the
-quick-start for someone who clones only that repo; both must stay in sync.
+Every implementation updates that repo's `.ai/` references **and** its `README.md`. The
+first is the design record a model reads, the second is the quick-start for a human who
+clones only that repo. Update the parent's `docs/specs/services/<svc>.md` only when the
+*reasoning* changed — it holds no facts to sync.

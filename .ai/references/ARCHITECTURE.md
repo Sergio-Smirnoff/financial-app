@@ -1,18 +1,12 @@
 # Architecture
 
-System shape only. Patterns: `.ai/references/APP_STRUCTURE.md`. Per-service: `.ai/services/<service>.md`.
+System shape only. Patterns: `.ai/references/APP_STRUCTURE.md`. Per-service: `back/<svc>/.ai/AGENTS.md`.
 
 ## Polyrepo topology
 
-Every backend service folder and the frontend folder is its **own standalone git
-repository**, gitignored by the parent. Not submodules — the parent does not track their
-commits. Branching, committing and CI happen per repo; one logical change spanning two
-services means two branches and two commits, never one. The parent tracks `docs/`, `.ai/`,
-`infra/`, `scripts/`, `docker-compose*.yml` and `.env.example`.
-`back/financial-app-parent` is the Maven BOM plus commons aggregator (Spring Boot 3.4.2,
-Spring Cloud 2024.0.1, Java 21) — infrastructure, not a runtime service. Services inherit
-managed versions from it and never declare versions directly. It must be `mvn install`-ed
-before any service builds; `dev.sh` and every Dockerfile do this automatically.
+Every backend service folder and the frontend folder is its **own standalone git repository**, gitignored by parent.
+Branching, committing and CI happen per repo. The parent tracks `docs/`, `.ai/`, `infra/`, `scripts/`, `docker-compose*.yml`, `.env.example`.
+`back/financial-app-parent` is the Maven BOM plus commons aggregator (Spring Boot 3.4.2, Spring Cloud 2024.0.1, Java 21). Services inherit managed versions from it. Must be `mvn install`-ed before service builds.
 
 | Module | Contents | Consumed by |
 |---|---|---|
@@ -56,8 +50,7 @@ flowchart TD
     Gateway --> Investments[":8086 ms-investments"]
 ```
 
-It also aggregates dashboard data from ms-finances and ms-investments in one call, proxies
-per-service Swagger docs, and routes the SSE stream with no response timeout.
+It aggregates dashboard data from ms-finances/ms-investments, proxies Swagger docs, and routes SSE streams without timeout.
 
 ## Data stores
 
@@ -75,7 +68,7 @@ state asynchronously, so balances are eventually consistent with transaction rec
 ```
 financial-app/                  parent repo
 ├── .ai/                        canonical agent context (tracked)
-├── back/                       financial-app-parent/ + the 7 ms-* repos
+├── back/                       financial-app-parent/ + the 7 ms-* repos, each with .ai/
 ├── front/financial-app/        Next.js app
 ├── docs/                       human-readable docs, specs, reports
 ├── infra/                      traefik/, postgres/, monitoring/
@@ -91,6 +84,11 @@ financial-app/                  parent repo
 symlinks** into `.ai/` — gitignored, produced by `scripts/ai-link.sh`. Run it once after
 cloning and again whenever an entry point is added. Never edit a generated path; edit the
 `.ai/` file it points at.
+
+Context is two-level. The parent `.ai/` holds rules, architecture and cross-service routing;
+each service repo holds its own `.ai/AGENTS.md` plus lazy references, tracked by that repo.
+`scripts/ai-link.sh` generates the three entry-point symlinks in all ten repos. A service repo
+never copies a global rule — it points at the parent, and the parent workspace is required.
 
 Four references load every session via `@import`; everything else loads on demand, and skills
 load when their `description` matches the task. Gemini CLI has no skills or agents discovery —

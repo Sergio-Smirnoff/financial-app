@@ -44,8 +44,11 @@ its trigger fires, not before.
 runtime service.
 
 > **Before reading or editing any file under `back/<service>/` or `front/`, first read
-> `.ai/services/<service>.md`.** It carries repo-local facts nothing else duplicates.
-> Those files arrive in sub-project P2; until then, read that repo's own `README.md`.
+> `back/<service>/.ai/AGENTS.md`.** It carries repo-local facts nothing else duplicates, and
+> names the lazy references for that repo. Claude Code loads it automatically through the
+> repo's generated `CLAUDE.md`; other tools must read it explicitly.
+> Cross-service routing: `.ai/services/MAP.md`. Third-party contracts:
+> `.ai/services/EXTERNAL.md`.
 
 ## Skills and agents
 
