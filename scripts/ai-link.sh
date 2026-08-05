@@ -20,6 +20,7 @@ LINKS=(
   ".ai/mcps/mcp_config.json|.mcp.json"
   ".ai/skills|.claude/skills"
   ".ai/agents|.claude/agents"
+  ".ai/hooks|.claude/hooks"
 )
 
 for entry in "${LINKS[@]}"; do

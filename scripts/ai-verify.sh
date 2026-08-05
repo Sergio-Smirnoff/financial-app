@@ -198,6 +198,52 @@ p2g7() {
                        || bad "P2-G7 out-of-scope files above"
 }
 
+# --- P3-G1: skill definitions formatting ------------------------------------
+p3g1() {
+  local count=0 missing=0
+  for f in .ai/skills/*/SKILL.md; do
+    [[ -f "$f" ]] || continue
+    ((count++))
+    if ! $GREP -q '^name:' "$f" || ! $GREP -q '^description:' "$f"; then
+      printf '        %s missing frontmatter\n' "$f"
+      missing=1
+    fi
+  done
+  (( count > 0 && missing == 0 )) && pass "P3-G1 all $count skills formatted with frontmatter" \
+                                 || bad "P3-G1 skill frontmatter validation failed"
+}
+
+# --- P3-G2: agent definitions ------------------------------------------------
+p3g2() {
+  local count=0
+  for f in .ai/agents/*.md; do
+    [[ -f "$f" ]] && ((count++))
+  done
+  (( count > 0 )) && pass "P3-G2 $count agent definitions present" \
+                  || bad "P3-G2 no agent definitions found"
+}
+
+# --- P3-G3: MCP configuration ------------------------------------------------
+p3g3() {
+  if [[ -f .ai/mcps/mcp_config.json ]] && python3 -m json.tool .ai/mcps/mcp_config.json >/dev/null 2>&1; then
+    pass "P3-G3 .ai/mcps/mcp_config.json valid JSON"
+  else
+    bad "P3-G3 .ai/mcps/mcp_config.json invalid or missing"
+  fi
+}
+
+# --- P3-G4: executable hooks -------------------------------------------------
+p3g4() {
+  local count=0 nonexec=0
+  for f in .ai/hooks/*.sh; do
+    [[ -f "$f" ]] || continue
+    ((count++))
+    [[ -x "$f" ]] || nonexec=1
+  done
+  (( count > 0 && nonexec == 0 )) && pass "P3-G4 all $count hook scripts executable" \
+                                  || bad "P3-G4 hook permissions invalid"
+}
+
 g2
 g4
 g5
@@ -215,5 +261,10 @@ p2g4
 p2g5
 p2g6
 p2g7
+
+p3g1
+p3g2
+p3g3
+p3g4
 
 exit $fail
