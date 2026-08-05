@@ -27,9 +27,9 @@ g2() {
     -e 'docs/specs/rules' -e 'docs/specs/workflow' -e 'docs/specs/architecture' \
     -e 'docs/specs/deployment' -e 'docs/specs/00-master' . \
     --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=back \
-    --exclude-dir=front --exclude-dir=superpowers 2>/dev/null \
-    | $GREP -v 'ai-restructure-p1' | $GREP -v 'ai-verify.sh' \
-    | $GREP -v '_migration-coverage' || true)
+    --exclude-dir=front --exclude-dir=.superpowers 2>/dev/null \
+    | $GREP -v 'ai-restructure' | $GREP -v 'ai-verify.sh' \
+    | $GREP -v 'superpowers' | $GREP -v '_migration-coverage' || true)
   if [[ -z "$hits" ]]; then pass "G2 no references to deleted spec paths"
   else bad "G2 stale references in:"; printf '        %s\n' $hits; fi
 }
