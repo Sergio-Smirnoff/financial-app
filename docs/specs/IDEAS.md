@@ -52,13 +52,12 @@ it's ready to build.
   those notifications fail TS narrowing. `[ux]` `[tech-debt]`
 - Frontend declares numeric fields as `number` but ms-investments serialises money as `String`
   over the wire — type mismatch for callers. Align frontend types. `[ux]` `[tech-debt]`
-- No shared `Cbu` in commons — four divergent `Cbu.java` copies exist in ms-banks, ms-finances, ms-investments, and ms-upload. Move `Cbu` to `commons-core`. `[tech-debt]` `[P2-finding]`
-- `ms-upload` carries an unused `spring-kafka` dependency and an uninjected `BanksClient` Feign interface. Clean up dead wiring. `[tech-debt]` `[P2-finding]`
-- ms-banks V6 `processed_events` table exists with no entity mapping it. Drop dead migration/table or document. `[tech-debt]` `[P2-finding]`
-- Task 2's commit (`ms-banks`) was verified in-session rather than by an independent reviewer. Worth one pass before merge. `[P2-finding]`
-
 ## In progress / promoted
 
+- Consolidate `Cbu` value object into `commons-core` → resolved 2026-08-05 (`com.financialapp.commons.core.domain.model.Cbu`)
+- Clean up `ms-upload` dead wiring (`spring-kafka`, `BanksClient`) → resolved 2026-08-05
+- Document ms-banks V6 `processed_events` legacy table status → resolved 2026-08-05
+- AI Context Baseline Restructure (P1, P2, P3, P4) → completed 2026-08-05
 - Host the application on the cloud → researched, spec: [2026-06-05-cloud-hosting-research.md](../superpowers/specs/2026-06-05-cloud-hosting-research.md)
 - Java 25 migration → researched, decision: Boot 4.0 + SC 2025.1 + Java 25, spec: [2026-06-05-java-25-spring-boot-4-migration.md](../superpowers/specs/2026-06-05-java-25-spring-boot-4-migration.md)
 
