@@ -1,3 +1,19 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://financial_user:financial_pass@localhost:5432/financial_app"
+      ],
+      "env": {
+        "PGHOST": "localhost",
+        "PGPORT": "5432",
+        "PGUSER": "financial_user",
+        "PGPASSWORD": "financial_pass",
+        "PGDATABASE": "financial_app"
+      }
+    }
+  }
 }
