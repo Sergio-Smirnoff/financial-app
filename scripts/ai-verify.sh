@@ -183,9 +183,14 @@ p2g6() {
 
 # --- P2-G7: repo diffs touch only agent context ------------------------------
 p2g7() {
-  local repo files offenders=0
+  local repo sha files offenders=0
   for repo in "${P2_REPOS[@]}"; do
-    files="$(git -C "$repo" diff --name-only HEAD~1..HEAD 2>/dev/null || true)"
+    sha="$(git -C "$repo" log --grep="docs(ai): add repo-local agent context" -n 1 --format="%H" 2>/dev/null || true)"
+    if [[ -n "$sha" ]]; then
+      files="$(git -C "$repo" diff --name-only "${sha}~1..${sha}" 2>/dev/null || true)"
+    else
+      files="$(git -C "$repo" diff --name-only HEAD~1..HEAD 2>/dev/null || true)"
+    fi
     while read -r f; do
       [[ -z "$f" ]] && continue
       case "$f" in
