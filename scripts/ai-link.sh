@@ -49,4 +49,34 @@ for entry in "${LINKS[@]}"; do
   fi
 done
 
+REPOS=(
+  "back/financial-app-parent" "back/ms-banks" "back/ms-finances" "back/ms-gateway"
+  "back/ms-investments" "back/ms-notifications" "back/ms-upload" "back/ms-users"
+  "front/financial-app"
+)
+
+for repo in "${REPOS[@]}"; do
+  target="$repo/.ai/AGENTS.md"
+  if [[ ! -e "$target" ]]; then
+    printf 'skip  %-34s target %s absent\n' "$repo" "$target"
+    continue
+  fi
+  for name in CLAUDE.md AGENTS.md GEMINI.md; do
+    link="$repo/$name"
+    rel=".ai/AGENTS.md"
+    if [[ "$MODE" == "--check" ]]; then
+      actual="$(readlink "$link" 2>/dev/null || true)"
+      if [[ "$actual" == "$rel" ]]; then
+        printf 'ok    %-34s -> %s\n' "$link" "$rel"
+      else
+        printf 'FAIL  %-34s -> expected %s, got %s\n' "$link" "$rel" "${actual:-<missing>}"
+        fail=1
+      fi
+    else
+      ln -sfn "$rel" "$link"
+      printf 'link  %-34s -> %s\n' "$link" "$rel"
+    fi
+  done
+done
+
 exit $fail
