@@ -54,6 +54,8 @@ front/financial-app/
 # Custom
 git-manager.sh
 .dev-pids
+docs/specs/
+docs/plans/
 
 # Generated AI entry points — canonical content lives in .ai/ (see scripts/ai-link.sh)
 /CLAUDE.md
