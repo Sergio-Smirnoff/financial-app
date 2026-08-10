@@ -138,6 +138,9 @@ services:
 
   gateway:
     <<: *spring-base
+    build:
+      context: ./back
+      dockerfile: ms-gateway/Dockerfile
     image: ghcr.io/sergio-smirnoff/financial-app-back-ms-gateway:${GATEWAY_VERSION:-latest}
     container_name: gateway
     environment:

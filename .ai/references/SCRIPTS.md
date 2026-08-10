@@ -72,3 +72,8 @@ Timestamped Postgres and MinIO archives into `./backups`.
 `ai-link.sh` regenerates the symlinks from `.ai/` to the tool-specific entry points; run it
 once after cloning, `--check` verifies without writing. `ai-verify.sh` runs the structural
 gates over `.ai/`. See `ARCHITECTURE.md` § AI context layer.
+
+## `dump-gateway-openapi.sh` — OpenAPI snapshot dump
+
+Dumps `ms-gateway`'s `/v3/api-docs` to `front/financial-app/openapi/gateway.json` with sorted keys for BFF contract generation. Prerequisites: gateway service running (`docker compose --profile app up -d gateway`).
+
