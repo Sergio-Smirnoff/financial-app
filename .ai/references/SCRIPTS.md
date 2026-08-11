@@ -77,3 +77,12 @@ gates over `.ai/`. See `ARCHITECTURE.md` § AI context layer.
 
 Dumps `ms-gateway`'s `/v3/api-docs` to `front/financial-app/openapi/gateway.json` with sorted keys for BFF contract generation. Prerequisites: gateway service running (`docker compose --profile app up -d gateway`).
 
+## `seed-demo-user.sh` — deterministic demo user seed
+
+Seeds standard demo user data (`demo@financial.app` / `Demo!2026pass`) across accounts, credit cards, categories, transactions, budgets, loans, and import runs. Idempotent. Prerequisites: backend stack running.
+
+## `capture-bff-payloads.sh` — BFF fixture capture
+
+Runs `seed-demo-user.sh` and records HTTP responses for all 9 BFF composition endpoints to `front/financial-app/lib/api/bff/__fixtures__/*.json`.
+
+

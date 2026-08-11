@@ -180,6 +180,9 @@ services:
 
   service-users:
     <<: *spring-base
+    build:
+      context: ./back
+      dockerfile: ms-users/Dockerfile
     image: ghcr.io/sergio-smirnoff/financial-app-back-ms-users:${USERS_VERSION:-latest}
     container_name: service-users
     environment:
@@ -196,6 +199,9 @@ services:
 
   service-finances:
     <<: *spring-base
+    build:
+      context: ./back
+      dockerfile: ms-finances/Dockerfile
     image: ghcr.io/sergio-smirnoff/financial-app-back-ms-finances:${FINANCES_VERSION:-latest}
     container_name: service-finances
     environment:
@@ -209,6 +215,9 @@ services:
 
   service-banks:
     <<: *spring-base
+    build:
+      context: ./back
+      dockerfile: ms-banks/Dockerfile
     image: ghcr.io/sergio-smirnoff/financial-app-back-ms-banks:${BANKS_VERSION:-latest}
     container_name: service-banks
     environment:
@@ -222,6 +231,9 @@ services:
 
   service-notifications:
     <<: *spring-base
+    build:
+      context: ./back
+      dockerfile: ms-notifications/Dockerfile
     image: ghcr.io/sergio-smirnoff/financial-app-back-ms-notifications:${NOTIFICATIONS_VERSION:-latest}
     container_name: service-notifications
     environment:
@@ -245,6 +257,9 @@ services:
 
   service-upload:
     <<: *spring-base
+    build:
+      context: ./back
+      dockerfile: ms-upload/Dockerfile
     image: ghcr.io/sergio-smirnoff/financial-app-back-ms-upload:${UPLOAD_VERSION:-latest}
     container_name: service-upload
     depends_on:
@@ -266,6 +281,9 @@ services:
 
   service-investments:
     <<: *spring-base
+    build:
+      context: ./back
+      dockerfile: ms-investments/Dockerfile
     image: ghcr.io/sergio-smirnoff/financial-app-back-ms-investments:${INVESTMENTS_VERSION:-latest}
     container_name: service-investments
     environment:
