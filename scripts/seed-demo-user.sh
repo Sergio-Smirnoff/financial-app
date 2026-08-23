@@ -27,6 +27,30 @@ post() { # post <path> <json>
   esac
 }
 
+# Read a count through the BFF, retrying while the stack is still warming up:
+# a cold gateway serves UNAVAILABLE sections whose fallback looks like real emptiness.
+bff_count() { # bff_count <url-path> <jq-count-expr>
+  local count attempt
+  for attempt in 1 2 3 4 5; do
+    count=$(curl -s -b "$JAR" "$GW$1" | jq -r "$2" 2>/dev/null || echo 0)
+    if [ "${count:-0}" -gt 0 ] 2>/dev/null; then echo "$count"; return 0; fi
+    sleep 3
+  done
+  echo "${count:-0}"
+}
+
+# A seed step that persists nothing is a failure, not a success message.
+verify() { # verify <label> <url-path> <jq-count-expr>
+  local count
+  count=$(bff_count "$2" "$3")
+  if [ "${count:-0}" -gt 0 ] 2>/dev/null; then
+    say "verified: $1 ($count)"
+  else
+    echo "SEED FAILURE: $1 produced no rows (checked $2)" >&2
+    exit 1
+  fi
+}
+
 # 1. Register & Login
 curl -s -o /dev/null -c "$JAR" -H 'Content-Type: application/json' \
   -X POST "$GW/api/v1/auth/register" \
@@ -62,7 +86,7 @@ tx() { # tx <from> <to> <amount> <categoryId> <desc> <date> <method>
 }
 
 # Check if transactions already exist
-EXISTING_TX=$(curl -s -b "$JAR" "$GW/api/v1/bff/transactions?currency=ARS&secondary=none&page=0&size=1" | jq -r '.data.page.totalElements // 0' 2>/dev/null || echo 0)
+EXISTING_TX=$(bff_count "/api/v1/bff/transactions?currency=ARS&secondary=none&page=0&size=1" '.data.page.data.totalElements // 0')
 if [ "$EXISTING_TX" -gt 0 ]; then
   say "transactions already exist, skipping transaction seeding"
 else
@@ -87,7 +111,7 @@ curl -sf -o /dev/null -b "$JAR" -H 'Content-Type: application/json' \
 say "budget created/updated for category $CAT_SUPER"
 
 # 6. Loan with installments
-EXISTING_LOANS=$(curl -s -b "$JAR" "$GW/api/v1/bff/banks?currency=ARS&secondary=none" | jq -r '.data.loans.data | length // 0' 2>/dev/null || echo 0)
+EXISTING_LOANS=$(bff_count "/api/v1/bff/banks?currency=ARS&secondary=none" '.data.loans.data | length')
 if [ "$EXISTING_LOANS" -gt 0 ]; then
   say "loans already exist, skipping loan seeding"
 else
@@ -95,7 +119,7 @@ else
 fi
 
 # 7. Import run
-EXISTING_IMPORTS=$(curl -s -b "$JAR" "$GW/api/v1/bff/imports" | jq -r '.data.history.data | length // 0' 2>/dev/null || echo 0)
+EXISTING_IMPORTS=$(bff_count "/api/v1/bff/imports" '.data.history.data | length')
 if [ "$EXISTING_IMPORTS" -gt 0 ]; then
   say "imports already exist, skipping import seeding"
 else
@@ -104,9 +128,25 @@ else
   echo "$PREVIEW" | jq -e '.data' >/dev/null || { echo "preview failed: $PREVIEW" >&2; exit 1; }
 
   TEMP_KEY=$(echo "$PREVIEW" | jq -r '.data.tempKey // .data.previewId')
-  curl -s -o /dev/null -b "$JAR" -H 'Content-Type: application/json' -X POST "$GW/api/v1/upload/csv/confirm" \
-    -d "{\"tempKey\":\"$TEMP_KEY\",\"accountCbu\":\"$CHECKING\",\"bankNumber\":\"$BANK\",\"dateCol\":0,\"descCol\":1,\"montoCol\":2,\"dateFormat\":\"yyyy-MM-dd\",\"fileType\":\"CSV\"}"
-  say "import run completed"
+  post /api/v1/upload/csv/confirm \
+    "{\"tempKey\":\"$TEMP_KEY\",\"accountCbu\":\"$CHECKING\",\"bankNumber\":\"$BANK\",\"dateCol\":0,\"descCol\":1,\"montoCol\":2,\"dateFormat\":\"yyyy-MM-dd\",\"fileType\":\"CSV\"}"
+  say "import run confirmed: $(cat /tmp/post.out | jq -c '.data' 2>/dev/null)"
 fi
+
+# 8. Holdings so Inversiones has positions
+EXISTING_HOLDINGS=$(bff_count "/api/v1/investments/holdings?page=0&size=1" '.data.totalElements // 0')
+if [ "$EXISTING_HOLDINGS" -gt 0 ]; then
+  say "holdings already exist, skipping holding seeding"
+else
+  post /api/v1/investments/holdings "{\"bankNumber\":\"$BANK\",\"fundingCbu\":\"$CHECKING\",\"ticker\":\"YPFD\",\"name\":\"YPF S.A.\",\"assetType\":\"STOCK\",\"quantity\":50,\"avgPurchasePrice\":32000,\"currency\":\"ARS\"}"
+  post /api/v1/investments/holdings "{\"bankNumber\":\"$BANK\",\"fundingCbu\":\"$CHECKING\",\"ticker\":\"AAPL\",\"name\":\"Apple Inc. CEDEAR\",\"assetType\":\"CEDEAR\",\"quantity\":30,\"avgPurchasePrice\":21500,\"currency\":\"ARS\"}"
+fi
+
+# 9. Every seeded entity must be visible through the BFF it belongs to.
+verify "transactions"       "/api/v1/bff/transactions?currency=ARS&secondary=none&page=0&size=1" '.data.page.data.totalElements // 0'
+verify "budgets"            "/api/v1/bff/categories?currency=ARS&secondary=none"                 '.data.budgets.data | length'
+verify "loans"              "/api/v1/bff/banks?currency=ARS&secondary=none"                      '.data.loans.data | length'
+verify "import history"     "/api/v1/bff/imports"                                                '.data.history.data | length'
+verify "holding positions"  "/api/v1/bff/investments?currency=ARS&secondary=none"                '.data.positions.data | length'
 
 say "Demo user seeding completed successfully."
