@@ -51,16 +51,40 @@ it's ready to build.
   `TransactionController` accepts `cursor`/`size` (no `page`), and the `categories`/`accounts`
   filters are accepted by the gateway signature but never forwarded. The BFF page section
   works only because the default window fits one response. `[bug]` `[tech-debt]`
-- `npx tsc --noEmit` reports ~303 pre-existing errors in `front/financial-app` (dashboard
-  pages passing plain strings where the generated currency union is expected,
-  `design-preview` referencing deleted components). CI does not run tsc, so they accumulate
-  silently. `[tech-debt]`
+- ~~`npx tsc --noEmit` reports ~303 pre-existing errors in `front/financial-app`~~ —
+  superseded by the Wave 4 Round A entry below: down to 142 after the dead-code purge, and no
+  longer silent (they now fail `next build`). `[tech-debt]`
 - IOL market data is unavailable in local development; the investments `marketStrip` is
   correctly `UNAVAILABLE` offline. If a local fixture upstream is ever wanted, it belongs in
   ms-investments, not the gateway. `[infra]`
 - The `frontend` compose service serves a stale published image (built pre-redesign) and
   holds port 3000; the live-smoke procedure stops it. Decide in Wave 4 whether to rebuild it
   in CI or drop it from the `app` profile. `[infra]` `[tech-debt]`
+
+### Tech-debt — found during Wave 4 Round A (2026-08-23)
+- ~~`lib/hooks/__tests__/useOverviewPage.test.tsx:76` trips `react/display-name`~~ — fixed
+  2026-08-23 (named the wrapper component; in the front working tree, pending commit). With
+  lint clear, `npm run build` now advances to type-check and fails there — see the tsc entry
+  below. `[bug]` `[front]`
+- `npx tsc --noEmit` in `front/financial-app` is down to **142 errors (83 outside
+  tests/design-preview)** after the Round A dead-code purge, but they are **no longer
+  silent**: with the lint error fixed, `next build` reaches its type-check stage and fails on
+  them (first failure `app/(dashboard)/banks/page.tsx:13` — all 7 dashboard pages pass the
+  raw `useQueryState` string where the generated `"ARS" | "USD_MEP" | "USD_CCL"` union is
+  expected; the bulk of the rest are `Section<T>`/`MoneyView` mismatches in the page content
+  components). **`npm run build` has been red on develop since 2026-08-09 and cannot go green
+  until these are fixed — needs a dedicated remediation task before Round B gates on green
+  builds.** `[bug]` `[tech-debt]` `[front]`
+- `tsconfig.tsbuildinfo` is tracked in git in `front/financial-app` — a build cache under
+  version control that already produced a false hit in a dead-code reference grep. Add to
+  `.gitignore` and `git rm --cached`. `[tech-debt]` `[front]`
+- Loan KPIs assume every loan is ARS: `GetLoansBffUseCaseImpl.toKpis`, the Bancos
+  `loanBalance` KPI and Overview `breakdown.debt` sum amounts across loans and convert the
+  total from `Currency.ARS`, but ms-banks loans carry a `currency` field and USD loans are
+  creatable today — a mixed-currency portfolio misreports the totals. Same for
+  `GetLoanScheduleBffUseCaseImpl`, which converts installment amounts from ARS without
+  fetching the loan row. Needs a real multi-currency sum before the Préstamos page (plan 10)
+  ships mixed-currency data. `[bug]` `[gateway]`
 
 ### Tech-debt — code/canon divergences (found in 2026-06-04 doc QA)
 - ms-finances names its exception advice `DomainExceptionHandler`; canon (rules.md) is
