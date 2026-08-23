@@ -10,6 +10,9 @@ PASSWORD='Demo!2026pass'
 
 CHECKING=0170099200000000000017
 SAVINGS=0170099200000000000024
+# Not owned by the demo user: spends must leave the wallet or the ownership-derived
+# kind classifies them as internal transfers and budgets never see them.
+EXTERNAL=2850590940090418135201
 CARD=4509953566233704
 BANK=017
 
@@ -85,22 +88,23 @@ tx() { # tx <from> <to> <amount> <categoryId> <desc> <date> <method>
     "{\"fromCbu\":\"$1\",\"toCbu\":\"$2\",\"amount\":\"$3\",\"currency\":\"ARS\",\"categoryId\":$4,\"description\":\"$5\",\"date\":\"$6\",\"paymentMethod\":\"$7\"}"
 }
 
-# Check if transactions already exist
-EXISTING_TX=$(bff_count "/api/v1/bff/transactions?currency=ARS&secondary=none&page=0&size=1" '.data.page.data.totalElements // 0')
-if [ "$EXISTING_TX" -gt 0 ]; then
-  say "transactions already exist, skipping transaction seeding"
+# The budgets read expense spend, and an expense means money leaving the wallet:
+# owned → owned is a transfer, owned → external is the spend the budget sees.
+EXISTING_SPEND=$(bff_count "/api/v1/bff/categories?currency=ARS&secondary=none" '.data.kpis.data.spent.amount // "0" | tonumber | floor')
+if [ "$EXISTING_SPEND" -gt 0 ]; then
+  say "budget spend already visible, skipping transaction seeding"
 else
   # income, current and previous month
-  tx "$SAVINGS" "$CHECKING" 1450000.00 "$CAT_SUELDO" "Sueldo"        "$THIS_MONTH-05" TRANSFER
-  tx "$SAVINGS" "$CHECKING" 1380000.00 "$CAT_SUELDO" "Sueldo"        "$LAST_MONTH-05" TRANSFER
+  tx "$EXTERNAL" "$CHECKING" 1450000.00 "$CAT_SUELDO" "Sueldo"        "$THIS_MONTH-05" TRANSFER
+  tx "$EXTERNAL" "$CHECKING" 1380000.00 "$CAT_SUELDO" "Sueldo"        "$LAST_MONTH-05" TRANSFER
   # spend, current month — Supermercado is deliberately over its cap
-  tx "$CHECKING" "$SAVINGS"  185000.00 "$CAT_SUPER"  "Coto"          "$THIS_MONTH-08" DEBIT_CARD
-  tx "$CHECKING" "$SAVINGS"  142500.50 "$CAT_SUPER"  "Jumbo"         "$THIS_MONTH-15" CREDIT_CARD
-  tx "$CHECKING" "$SAVINGS"   38200.00 "$CAT_TRANS"  "SUBE"          "$THIS_MONTH-03" DEBIT_CARD
-  tx "$CHECKING" "$SAVINGS"   21750.00 "$CAT_TRANS"  "Cabify"        "$THIS_MONTH-19" CREDIT_CARD
+  tx "$CHECKING" "$EXTERNAL"  185000.00 "$CAT_SUPER"  "Coto"          "$THIS_MONTH-08" DEBIT_CARD
+  tx "$CHECKING" "$EXTERNAL"  142500.50 "$CAT_SUPER"  "Jumbo"         "$THIS_MONTH-15" CREDIT_CARD
+  tx "$CHECKING" "$EXTERNAL"   38200.00 "$CAT_TRANS"  "SUBE"          "$THIS_MONTH-03" DEBIT_CARD
+  tx "$CHECKING" "$EXTERNAL"   21750.00 "$CAT_TRANS"  "Cabify"        "$THIS_MONTH-19" CREDIT_CARD
   # spend, previous month
-  tx "$CHECKING" "$SAVINGS"  156000.00 "$CAT_SUPER"  "Coto"          "$LAST_MONTH-09" DEBIT_CARD
-  tx "$CHECKING" "$SAVINGS"   33400.00 "$CAT_TRANS"  "SUBE"          "$LAST_MONTH-02" DEBIT_CARD
+  tx "$CHECKING" "$EXTERNAL"  156000.00 "$CAT_SUPER"  "Coto"          "$LAST_MONTH-09" DEBIT_CARD
+  tx "$CHECKING" "$EXTERNAL"   33400.00 "$CAT_TRANS"  "SUBE"          "$LAST_MONTH-02" DEBIT_CARD
 fi
 
 # 5. Budget that trips its threshold
@@ -145,6 +149,7 @@ fi
 # 9. Every seeded entity must be visible through the BFF it belongs to.
 verify "transactions"       "/api/v1/bff/transactions?currency=ARS&secondary=none&page=0&size=1" '.data.page.data.totalElements // 0'
 verify "budgets"            "/api/v1/bff/categories?currency=ARS&secondary=none"                 '.data.budgets.data | length'
+verify "budget spend"       "/api/v1/bff/categories?currency=ARS&secondary=none"                 '.data.kpis.data.spent.amount // "0" | tonumber | floor'
 verify "loans"              "/api/v1/bff/banks?currency=ARS&secondary=none"                      '.data.loans.data | length'
 verify "import history"     "/api/v1/bff/imports"                                                '.data.history.data | length'
 verify "holding positions"  "/api/v1/bff/investments?currency=ARS&secondary=none"                '.data.positions.data | length'

@@ -41,6 +41,27 @@ it's ready to build.
 - message connection
 - uploads migration, best way to reimplemented
 
+### Process rule — live verification (Wave 3.5 Round D, 2026-08-23)
+- **No wave may report a live-verification goal `met` without pasted run output.** Wave 3.5
+  closed on unit tests + drift gate alone; the first real run failed 8/8. The procedure lives
+  in `front/financial-app/README.md` (`npm run e2e:live`). `[process]`
+
+### Tech-debt — found during Wave 3.5 Round D (2026-08-23)
+- Gateway `FinancesGatewayImpl.fetchTransactions` cannot page or filter: ms-finances
+  `TransactionController` accepts `cursor`/`size` (no `page`), and the `categories`/`accounts`
+  filters are accepted by the gateway signature but never forwarded. The BFF page section
+  works only because the default window fits one response. `[bug]` `[tech-debt]`
+- `npx tsc --noEmit` reports ~303 pre-existing errors in `front/financial-app` (dashboard
+  pages passing plain strings where the generated currency union is expected,
+  `design-preview` referencing deleted components). CI does not run tsc, so they accumulate
+  silently. `[tech-debt]`
+- IOL market data is unavailable in local development; the investments `marketStrip` is
+  correctly `UNAVAILABLE` offline. If a local fixture upstream is ever wanted, it belongs in
+  ms-investments, not the gateway. `[infra]`
+- The `frontend` compose service serves a stale published image (built pre-redesign) and
+  holds port 3000; the live-smoke procedure stops it. Decide in Wave 4 whether to rebuild it
+  in CI or drop it from the `app` profile. `[infra]` `[tech-debt]`
+
 ### Tech-debt — code/canon divergences (found in 2026-06-04 doc QA)
 - ms-finances names its exception advice `DomainExceptionHandler`; canon (rules.md) is
   `GlobalExceptionHandler`. Rename. `[refactor]` `[tech-debt]`
