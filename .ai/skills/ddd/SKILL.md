@@ -58,9 +58,11 @@ com.financialapp.<service>/
 
 ## 4. `ms-gateway` exception
 
-`ms-gateway` is WebFlux, not servlet. It keeps the same `web` / `domain` / `infrastructure` split
-but has no `application` layer and no JPA — it is a routing/BFF layer, not a persistence-owning
-service. It consumes `commons-core` only, not `commons-web`.
+`ms-gateway` is WebFlux, not servlet. Since Wave 4 Round A it carries the full four-layer split —
+it **does** have an `application` layer (13 BFF use-case impls), so §1's dependency rule and §2's
+layer responsibilities apply to it unchanged. Two things stay gateway-specific: no JPA — it is a
+routing/BFF layer, not a persistence-owning service — and it consumes `commons-core` only, not
+`commons-web`.
 
 ## 5. Aggregate rules
 

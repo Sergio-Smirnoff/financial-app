@@ -66,18 +66,17 @@ it's ready to build.
   2026-08-23 (named the wrapper component; in the front working tree, pending commit). With
   lint clear, `npm run build` now advances to type-check and fails there — see the tsc entry
   below. `[bug]` `[front]`
-- `npx tsc --noEmit` in `front/financial-app` is down to **142 errors (83 outside
-  tests/design-preview)** after the Round A dead-code purge, but they are **no longer
-  silent**: with the lint error fixed, `next build` reaches its type-check stage and fails on
-  them (first failure `app/(dashboard)/banks/page.tsx:13` — all 7 dashboard pages pass the
-  raw `useQueryState` string where the generated `"ARS" | "USD_MEP" | "USD_CCL"` union is
-  expected; the bulk of the rest are `Section<T>`/`MoneyView` mismatches in the page content
-  components). **`npm run build` has been red on develop since 2026-08-09 and cannot go green
-  until these are fixed — needs a dedicated remediation task before Round B gates on green
-  builds.** `[bug]` `[tech-debt]` `[front]`
-- `tsconfig.tsbuildinfo` is tracked in git in `front/financial-app` — a build cache under
-  version control that already produced a false hit in a dead-code reference grep. Add to
-  `.gitignore` and `git rm --cached`. `[tech-debt]` `[front]`
+- ~~`npx tsc --noEmit` in `front/financial-app` is down to **142 errors (83 outside
+  tests/design-preview)**, no longer silent — `next build` reaches its type-check stage and
+  fails on them; red on develop since 2026-08-09~~ — **done 2026-08-23** on
+  `fix/wave4-tsc-remediation`: 142 → **0**, `npm run build` green (14/14 pages), 157/157 tests,
+  zero suppressions. Report: `docs/reports/develop_fix_2026-08-23_wave4-tsc-remediation.md`.
+  `[bug]` `[tech-debt]` `[front]`
+- `npm run typecheck` (`tsc --noEmit`) now exists in `front/financial-app` and is green, but
+  **nothing enforces it** — only `next build` would catch a regression, and only at merge time.
+  Wiring it into the front CI workflow is a plan-12 question. `[infra]` `[front]`
+- ~~`tsconfig.tsbuildinfo` is tracked in git in `front/financial-app`~~ — done 2026-08-23:
+  gitignored and `git rm --cached` (`c8a8787`). `[tech-debt]` `[front]`
 - Loan KPIs assume every loan is ARS: `GetLoansBffUseCaseImpl.toKpis`, the Bancos
   `loanBalance` KPI and Overview `breakdown.debt` sum amounts across loans and convert the
   total from `Currency.ARS`, but ms-banks loans carry a `currency` field and USD loans are
@@ -85,6 +84,34 @@ it's ready to build.
   `GetLoanScheduleBffUseCaseImpl`, which converts installment amounts from ARS without
   fetching the loan row. Needs a real multi-currency sum before the Préstamos page (plan 10)
   ships mixed-currency data. `[bug]` `[gateway]`
+
+#### Found during Wave 4 plan 03b — tsc remediation (2026-08-23)
+
+- `components/pages/categories/BudgetTab.tsx:37` reads `cat.cap.amount`, but the schema types
+  `BudgetRowResponse.cap` as a bare `number` — the read is always `undefined`, so every budget
+  renders "Sin límite" and the progress bar never appears. Hidden by the pre-existing
+  `(cat: any)` on line 35. `[bug]` `[front]`
+- Double error toast on a failed account create: `useAccounts.onError` toasts and
+  `AddAccountDialog`'s `catch` toasts, and `mutateAsync` fires both. Pick one place to report
+  mutation errors. `[ux]` `[front]`
+- "Agregar cuenta" is reachable **only** as the accounts empty-state action — a user who
+  already has accounts has no affordance to open the dialog. The dialog's edit path
+  (`onUpdate`) is dead for the same reason: nothing ever passes it an `account`. `[ux]` `[front]`
+- Invented-zero fallbacks still remain at `AccountsTab:49`, `CardsTab:45` and
+  `CashDistributionCard:17` — they need `AccountCard.balance` / `CompositionBar` prop widenings
+  so a missing amount renders the em-dash placeholder instead of `$0,00`. `[tech-debt]` `[front]`
+- Live `any` sweep for the front: `(e: any)` ×3 in `lib/hooks/useBanks.ts` (onError), plus
+  `as any` in tests — `ImportsContent` ×2, `TransactionsContent`, `OverviewContent`,
+  `InvestmentsContent` ×4. `[tech-debt]` `[front]`
+- **`app/design-preview/page.tsx` is orphaned** — it renders an empty placeholder `<div>` and
+  nothing imports the `sections/tier12`, `tier34` or `charts` modules, although
+  `sections/README.md` claims they are rendered there. Needs wiring before Round B eyeballs it.
+  Two defects behind it: `middleware.ts` matches public paths by exact equality, so any
+  `/design-preview/*` sub-route redirects to `/login`; and the `FreshnessStamp` demos always
+  render the stale branch now that their timestamps are fixed instants. `[bug]` `[front]`
+- `CreditCardCardData` models closing and due days as two bare unvalidated `number`s — a
+  reification gap against the repo's VO conventions. Separately, `AddAccountDialog` defaults
+  `currency` to `USD` on an ARS-first product. `[tech-debt]` `[front]`
 
 ### Tech-debt — code/canon divergences (found in 2026-06-04 doc QA)
 - ms-finances names its exception advice `DomainExceptionHandler`; canon (rules.md) is
