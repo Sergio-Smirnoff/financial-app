@@ -72,3 +72,17 @@ Timestamped Postgres and MinIO archives into `./backups`.
 `ai-link.sh` regenerates the symlinks from `.ai/` to the tool-specific entry points; run it
 once after cloning, `--check` verifies without writing. `ai-verify.sh` runs the structural
 gates over `.ai/`. See `ARCHITECTURE.md` § AI context layer.
+
+## `dump-gateway-openapi.sh` — OpenAPI snapshot dump
+
+Dumps `ms-gateway`'s `/v3/api-docs` to `front/financial-app/openapi/gateway.json` with sorted keys for BFF contract generation. Prerequisites: gateway service running (`docker compose --profile app up -d gateway`).
+
+## `seed-demo-user.sh` — deterministic demo user seed
+
+Seeds standard demo user data (`demo@financial.app` / `Demo!2026pass`) across accounts, credit cards, categories, transactions, budgets, loans, and import runs. Idempotent. Prerequisites: backend stack running.
+
+## `capture-bff-payloads.sh` — BFF fixture capture
+
+Runs `seed-demo-user.sh` and records HTTP responses for all 9 BFF composition endpoints to `front/financial-app/lib/api/bff/__fixtures__/*.json`.
+
+
