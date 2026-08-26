@@ -68,12 +68,6 @@ elif [[ ! -f "$ENV_FILE" ]]; then
   warn ".env not found! Let's configure it now."
   echo ""
   read -p "Enter Domain Name (e.g. sergio.duckdns.org): " DOMAIN_NAME
-  read -p "Are you using DuckDNS? (y/n): " IS_DUCK
-  if [[ $IS_DUCK =~ ^[Yy]$ ]]; then
-    read -p "  Enter DuckDNS Token: " DUCK_TOKEN
-    read -p "  Enter DuckDNS Subdomain (just the name, no .duckdns.org): " DUCK_SUB
-  fi
-  read -p "Enter Email for Let's Encrypt SSL: " ACME_EMAIL
   read -p "Enter new Postgres password: " PG_PASS
   read -p "Enter new Minio admin password: " MINIO_PASS
   
@@ -88,11 +82,6 @@ elif [[ ! -f "$ENV_FILE" ]]; then
   sed -i "s/JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" "$ENV_FILE"
   sed -i "s/INTERNAL_AUTH_TOKEN=.*/INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN}/" "$ENV_FILE"
   sed -i "s/DOMAIN_NAME=.*/DOMAIN_NAME=${DOMAIN_NAME}/" "$ENV_FILE"
-  sed -i "s/ACME_EMAIL=.*/ACME_EMAIL=${ACME_EMAIL}/" "$ENV_FILE"
-  if [[ $IS_DUCK =~ ^[Yy]$ ]]; then
-    sed -i "s/DUCKDNS_TOKEN=.*/DUCKDNS_TOKEN=${DUCK_TOKEN}/" "$ENV_FILE"
-    sed -i "s/DUCKDNS_DOMAIN=.*/DUCKDNS_DOMAIN=${DUCK_SUB}/" "$ENV_FILE"
-  fi
   sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://${DOMAIN_NAME},http://localhost|" "$ENV_FILE"
   sed -i "s|NEXT_PUBLIC_GATEWAY_URL=.*|NEXT_PUBLIC_GATEWAY_URL=https://${DOMAIN_NAME}/api|" "$ENV_FILE"
   
@@ -113,20 +102,15 @@ GH_PAT_FROM_ENV=$(grep "^GH_PAT=" "$ENV_FILE" | cut -d'=' -f2- | tr -d '"' | tr 
 # Check for other missing production variables
 MISSING_VARS=false
 if ! grep -q "^DOMAIN_NAME=" "$ENV_FILE"; then MISSING_VARS=true; fi
-if ! grep -q "^ACME_EMAIL=" "$ENV_FILE"; then MISSING_VARS=true; fi
 if ! grep -q "^INTERNAL_AUTH_TOKEN=" "$ENV_FILE"; then MISSING_VARS=true; fi
 
 if $MISSING_VARS; then
-  warn "Some production variables (Domain, SSL, S2S Token) are missing from your .env."
+  warn "Some production variables (Domain, S2S Token) are missing from your .env."
   read -p "Would you like to configure them now? (y/n): " UPDATE_ENV
   if [[ $UPDATE_ENV =~ ^[Yy]$ ]]; then
     if ! grep -q "^DOMAIN_NAME=" "$ENV_FILE"; then
         read -p "  Enter Domain Name (e.g. sergio.duckdns.org): " DOMAIN_NAME
         echo "DOMAIN_NAME=${DOMAIN_NAME}" >> "$ENV_FILE"
-    fi
-    if ! grep -q "^ACME_EMAIL=" "$ENV_FILE"; then
-        read -p "  Enter Email for Let's Encrypt SSL: " ACME_EMAIL
-        echo "ACME_EMAIL=${ACME_EMAIL}" >> "$ENV_FILE"
     fi
     if ! grep -q "^INTERNAL_AUTH_TOKEN=" "$ENV_FILE"; then
         INTERNAL_AUTH_TOKEN=$(openssl rand -hex 32)
@@ -171,6 +155,10 @@ fi
 if $UPDATE_MODE; then
   info "Pulling app images (pinned in docker-compose.prod.yml) ..."
   docker compose "${COMPOSE_FILES[@]}" --profile app pull
+  # Routing/TLS live in the homelab-infra edge stack; the app only joins its
+  # network. Compose refuses to start if the external network is absent.
+  info "Ensuring external 'edge' network exists ..."
+  docker network inspect edge >/dev/null 2>&1 || docker network create edge
   info "Restarting stack ..."
   docker compose "${COMPOSE_FILES[@]}" --profile app up -d
   success "Deploy updated. Status:"
@@ -184,9 +172,11 @@ fi
 echo ""
 info "Server bootstrapped. Next steps for Production Deployment:"
 echo ""
-echo "  1. Start infra:   docker compose -f docker-compose.yml up -d postgres kafka minio traefik duckdns"
-echo "  2. Pull images:   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile app pull"
-echo "  3. Start app:     docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile app up -d"
+echo "  1. Edge network:  docker network inspect edge >/dev/null 2>&1 || docker network create edge"
+echo "                    (routing/TLS run in the homelab-infra edge stack, not here)"
+echo "  2. Start infra:   docker compose -f docker-compose.yml up -d postgres kafka minio"
+echo "  3. Pull images:   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile app pull"
+echo "  4. Start app:     docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile app up -d"
 echo ""
 echo "  Subsequent deploys:  ./scripts/deploy.sh --update   (pulls repo + images, restarts)"
 echo "  Pin versions:        set <SERVICE>_VERSION in .env (e.g. FINANCES_VERSION=1.2.0)"

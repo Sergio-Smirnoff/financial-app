@@ -3,13 +3,13 @@
 # =============================================================================
 # Prod:  docker compose -f docker-compose.yml --profile app up -d
 #        (explicit -f => docker-compose.override.yml is NOT loaded => no host
-#         ports are published except Traefik 80/443)
+#         ports are published at all; routing/TLS live in the separate edge stack)
 # Dev:   docker compose --profile app up -d
 #        (docker-compose.override.yml auto-loads => host ports exposed per-ms)
 #
 # Monitoring (prometheus/grafana/loki/promtail) has NO profile => always up.
 # Infra (postgres/kafka/minio) has NO profile => always up.
-# App (gateway/services/frontend/traefik/duckdns) is gated behind profile `app`.
+# App (gateway/services/frontend) is gated behind profile `app`.
 # =============================================================================
 
 x-java-opts: &java-opts "-Xmx512m -Xms256m -XX:ActiveProcessorCount=2"
@@ -27,45 +27,6 @@ x-spring-service: &spring-base
 services:
 
   # ─── Infrastructure ─────────────────────────────────────────────────────────
-
-  traefik:
-    profiles: [app]
-    image: traefik:v3.0
-    container_name: traefik
-    command:
-      - "--api.insecure=false"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
-      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}"
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "letsencrypt:/letsencrypt"
-    networks:
-      - internal
-    restart: unless-stopped
-
-  duckdns:
-    profiles: [app]
-    image: lscr.io/linuxserver/duckdns:latest
-    container_name: duckdns
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=America/Argentina/Buenos_Aires
-      - SUBDOMAINS=${DUCKDNS_DOMAIN}
-      - TOKEN=${DUCKDNS_TOKEN}
-      - LOG_FILE=false
-    restart: unless-stopped
 
   postgres:
     image: postgres:17
@@ -162,21 +123,9 @@ services:
       - service-notifications
       - service-upload
       - service-investments
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.services.gateway.loadbalancer.server.port=8080"
-      # API
-      - "traefik.http.routers.gateway.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.gateway.entrypoints=websecure"
-      - "traefik.http.routers.gateway.tls.certresolver=myresolver"
-      - "traefik.http.routers.gateway.service=gateway"
-      # Swagger (basic-auth)
-      - "traefik.http.routers.swagger.rule=Host(`${DOMAIN_NAME}`) && (PathPrefix(`/swagger-ui`) || Path(`/swagger-ui.html`) || PathPrefix(`/v3/api-docs`))"
-      - "traefik.http.routers.swagger.entrypoints=websecure"
-      - "traefik.http.routers.swagger.tls.certresolver=myresolver"
-      - "traefik.http.routers.swagger.service=gateway"
-      - "traefik.http.routers.swagger.middlewares=swagger-auth"
-      - "traefik.http.middlewares.swagger-auth.basicauth.users=${SWAGGER_AUTH}"
+    networks:
+      - internal
+      - edge
 
   service-users:
     <<: *spring-base
@@ -312,11 +261,7 @@ services:
       - gateway
     networks:
       - internal
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN_NAME}`)"
-      - "traefik.http.routers.frontend.entrypoints=websecure"
-      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+      - edge
     restart: unless-stopped
 
   # ─── Monitoring (no profile → always up) ─────────────────────────────────────
@@ -353,6 +298,7 @@ services:
       - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     networks:
       - internal
+      - edge
     depends_on:
       - prometheus
       - loki
@@ -360,12 +306,6 @@ services:
       resources:
         limits:
           memory: 512M
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
-      - "traefik.http.routers.grafana.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/grafana`)"
-      - "traefik.http.routers.grafana.entrypoints=websecure"
-      - "traefik.http.routers.grafana.tls.certresolver=myresolver"
     restart: unless-stopped
 
   loki:
@@ -402,7 +342,6 @@ services:
 volumes:
   postgres_data:
   minio_data:
-  letsencrypt:
   kafka_data:
   prometheus_data:
   grafana_data:
@@ -411,3 +350,5 @@ volumes:
 networks:
   internal:
     driver: bridge
+  edge:
+    external: true

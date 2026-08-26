@@ -42,12 +42,29 @@ Copy `.env.example` to `.env`. Never commit `.env`.
 | `NEXT_PUBLIC_GATEWAY_URL` | `https://<domain>/api` | baked into the Next.js image at build |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | `minioadmin` / `changeme` | object storage |
 | `IOL_USERNAME` / `IOL_PASSWORD` | — | InvertirOnline price feed |
-| `DOMAIN_NAME` / `ACME_EMAIL` | — | Traefik host routing + Let's Encrypt |
+| `DOMAIN_NAME` | — | public hostname; feeds `ALLOWED_ORIGINS`, `NEXT_PUBLIC_GATEWAY_URL` and `GF_SERVER_ROOT_URL`. Host routing + TLS are configured in the edge stack, not here |
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` | — | notification email |
-| `DUCKDNS_DOMAIN` / `DUCKDNS_TOKEN` | — | optional dynamic DNS |
 | `GRAFANA_ADMIN_PASSWORD` | — | Grafana at `/grafana` |
-| `SWAGGER_AUTH` | `admin:$$apr1$$...` | htpasswd basic-auth. **Double every `$` to `$$` in `.env`** — compose interpolates values and a literal `$apr1$` hash gets corrupted. Generate `htpasswd -nb admin 'pass'`, then double |
 | `<SERVICE>_VERSION` | `latest` | pins the GHCR tag per service |
+
+## Routing and TLS (external — `homelab-infra/stacks/edge/`)
+
+This repo no longer runs Traefik or DuckDNS. Ingress, TLS termination, Let's Encrypt and
+dynamic DNS live in the separate **edge stack** at `homelab-infra/stacks/edge/`, which runs
+Traefik with the **file provider** (no Docker socket). Consequences:
+
+- App compose publishes **no host port at all** in production. Only the edge stack binds 80/443.
+- `gateway`, `frontend` and `grafana` join the **external `edge` network** under exactly those
+  DNS names — that is what the edge `dynamic/dynamic.yml` service URLs resolve to
+  (`http://gateway:8080`, `http://frontend:3000`, `http://grafana:3000`). Data stores
+  (postgres, kafka, minio, prometheus, loki, promtail) stay on `internal` only.
+- **Changing an app route (host, path prefix, port) requires a matching `dynamic.yml` commit
+  in homelab-infra.** There are no `traefik.*` labels in this repo any more; adding some would
+  do nothing.
+- Swagger basic-auth is enforced by the edge stack's middleware, so `SWAGGER_AUTH` is an edge
+  env var now, not an app one. `ACME_EMAIL`, `DUCKDNS_TOKEN` and `DUCKDNS_DOMAIN` moved there too.
+- Prod bring-up **expects the external `edge` network to already exist**:
+  `docker network create edge` (or bring the edge stack up first). Compose fails fast otherwise.
 
 ## Startup flow
 
@@ -64,8 +81,15 @@ schemas. Later `up` runs do not re-execute it.
 
 `docker-compose.override.yml` is **dev-only** and does exactly one thing: publish host ports —
 infra (5432, 9093, 9000/9001), gateway 8080, frontend 3000, every microservice 8081–8086 so
-per-service Swagger is reachable, monitoring (9090, 3001, 3100), and the Traefik dashboard on
-8888. Compose auto-loads it whenever you run plain `docker compose` with no `-f`.
+per-service Swagger is reachable, and monitoring (9090, 3001, 3100). Compose auto-loads it
+whenever you run plain `docker compose` with no `-f`.
+
+**Dev prerequisite (once per machine):** `grafana` carries no profile and joins `edge`, so even
+a plain dev `up` needs that network to exist. On a fresh clone, run:
+
+```bash
+docker network create edge     # once per machine; harmless if it already exists
+```
 
 Production therefore **must** name the file explicitly, so the override is never picked up:
 
@@ -73,8 +97,9 @@ Production therefore **must** name the file explicitly, so the override is never
 docker compose -f docker-compose.yml --profile app up -d
 ```
 
-Nothing is exposed to the host but Traefik's 80 and 443. Traefik terminates TLS and routes by
-host + path prefix to `gateway:8080`, `frontend:3000` or `grafana:3000`.
+In production the app stack publishes **no host ports**. The edge stack
+(`homelab-infra/stacks/edge/`) owns 80/443, terminates TLS and routes by host + path prefix
+over the shared `edge` network to `gateway:8080`, `frontend:3000` or `grafana:3000`.
 
 **Never run `docker-compose.override.yml` or `scripts/dev.sh` on a production server.**
 
@@ -95,8 +120,9 @@ Pin a service on the server by setting its `<SERVICE>_VERSION` in `.env`; unset 
 ## First-time deploy
 
 Requirements: Linux host x86-64 or ARM64 (images are multi-arch), 2+ vCPU, 4 GB+ RAM, ~20 GB
-disk; Docker Engine 24+ with Compose v2; ports 80 and 443 open; a domain pointing at the
-public IP; a GHCR classic PAT with `read:packages` if the images are private.
+disk; Docker Engine 24+ with Compose v2; a GHCR classic PAT with `read:packages` if the images
+are private. Ports 80/443, the domain and the certificates are the edge stack's business —
+see `homelab-infra/stacks/edge/`.
 
 The server needs the **root repo only** — images are prebuilt, service sources are never
 cloned there.
@@ -104,18 +130,20 @@ cloned there.
 1. `curl -fsSL https://get.docker.com | sh` (skip if Docker is present)
 2. `git clone https://github.com/Sergio-Smirnoff/financial-app.git && cd financial-app`
 3. `cp .env.example .env`, then fill in at minimum `POSTGRES_PASSWORD`, `JWT_SECRET`,
-   `INTERNAL_AUTH_TOKEN`, `KAFKA_CLUSTER_ID`, `DOMAIN_NAME`, `ACME_EMAIL`,
-   `GRAFANA_ADMIN_PASSWORD`, `SWAGGER_AUTH`, and `COOKIE_SECURE=true`
-4. Point an A record for `DOMAIN_NAME` at the server's public IP
+   `INTERNAL_AUTH_TOKEN`, `KAFKA_CLUSTER_ID`, `DOMAIN_NAME`, `GRAFANA_ADMIN_PASSWORD`, and
+   `COOKIE_SECURE=true`
+4. Bring up the edge stack (`homelab-infra/stacks/edge/`), which creates the external `edge`
+   network and handles DNS/TLS. Standalone check: `docker network create edge` if it is missing
 5. `echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-username> --password-stdin`
 6. `docker compose -f docker-compose.yml --profile app up -d`
 
-Traefik requests Let's Encrypt certificates on first start via HTTP-01, so port 80 must be
-reachable from the internet.
+The app stack will not start if the external `edge` network does not exist.
 
-`scripts/deploy.sh` automates steps 3 and 5 as a wizard; `scripts/deploy.sh --update` pulls
-the root repo and images (honouring `*_VERSION` pins) and restarts. Equivalent to the raw
-commands — use either.
+`scripts/deploy.sh` automates steps 3 and 5 as a wizard and then **prints** steps 4 and 6 for
+you to run — it does not bring the stack up itself. `scripts/deploy.sh --update` pulls the root
+repo and images (honouring `*_VERSION` pins), creates the external `edge` network if it is
+missing, and restarts the stack — that path is equivalent to running steps 4 and 6 by hand.
+Neither path starts the edge stack; routing/TLS are brought up separately from homelab-infra.
 
 ## Reachable after deploy
 
@@ -123,7 +151,7 @@ commands — use either.
 |---|---|---|
 | `https://<domain>` | frontend | app login |
 | `https://<domain>/api` | gateway | JWT cookie |
-| `https://<domain>/swagger-ui.html` | gateway (aggregated) | basic-auth via `SWAGGER_AUTH` |
+| `https://<domain>/swagger-ui.html` | gateway (aggregated) | basic-auth, enforced by the edge stack |
 | `https://<domain>/grafana` | grafana | `admin` / `GRAFANA_ADMIN_PASSWORD` |
 
 Internal-only in production: Postgres, Kafka, MinIO, Prometheus, Loki, Promtail.
@@ -143,10 +171,10 @@ docker compose -f docker-compose.yml --profile app down
 
 | Symptom | Cause / fix |
 |---|---|
-| Let's Encrypt cert not issued | port 80 unreachable, or DNS not propagated. Check `docker compose logs traefik` |
+| `network edge declared as external, but could not be found` | the edge stack is not up. Start it, or `docker network create edge` |
 | Kafka re-formats data on restart | `KAFKA_CLUSTER_ID` not set to a fixed value |
-| Swagger basic-auth always fails | `$` not doubled to `$$` in `SWAGGER_AUTH` — compose ate the hash |
+| Swagger basic-auth always fails | `SWAGGER_AUTH` is configured in the edge stack now — fix it there |
 | Service exits with auth error at boot | `INTERNAL_AUTH_TOKEN` missing |
-| Traefik 502 on `/api` | backend still starting or unhealthy — check `ps` and that service's logs |
+| 502 on `/api` | backend still starting or unhealthy, or `gateway` is not on the `edge` network — check `ps`, that service's logs, and `docker network inspect edge` |
 | CORS errors in browser | `ALLOWED_ORIGINS` must include `https://<domain>`; `NEXT_PUBLIC_GATEWAY_URL` must be `https://<domain>/api` |
 | Container OOM-killed | host under-provisioned — compose caps Spring services at 768 MB each |
