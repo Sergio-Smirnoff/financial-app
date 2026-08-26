@@ -157,7 +157,7 @@ Monitoring (Prometheus/Grafana/Loki/Promtail) is part of the stack and starts au
 
 ```bash
 # 1. Fill in .env (copy from .env.example), including:
-#    KAFKA_CLUSTER_ID, GRAFANA_ADMIN_PASSWORD, SWAGGER_AUTH
+#    KAFKA_CLUSTER_ID, GRAFANA_ADMIN_PASSWORD, DOMAIN_NAME
 # 2. Launch the whole stack (explicit -f bypasses the dev override):
 docker compose -f docker-compose.yml --profile app up -d
 ```
@@ -165,7 +165,8 @@ docker compose -f docker-compose.yml --profile app up -d
 Externally reachable:
 - App:      `https://${DOMAIN_NAME}`
 - API:      `https://${DOMAIN_NAME}/api`
-- Swagger:  `https://${DOMAIN_NAME}/swagger-ui.html` (HTTP basic-auth via `SWAGGER_AUTH`)
+- Swagger:  `https://${DOMAIN_NAME}/swagger-ui.html` (HTTP basic-auth, enforced by the edge
+            stack: `homelab-infra/stacks/edge/dynamic/swagger-auth.yml`)
 - Grafana:  `https://${DOMAIN_NAME}/grafana` (login via `GRAFANA_ADMIN_PASSWORD`)
 
 Internal-only (no host ports in prod): Postgres, Kafka, MinIO, Prometheus, Loki.
