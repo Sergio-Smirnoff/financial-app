@@ -84,6 +84,13 @@ infra (5432, 9093, 9000/9001), gateway 8080, frontend 3000, every microservice 8
 per-service Swagger is reachable, and monitoring (9090, 3001, 3100). Compose auto-loads it
 whenever you run plain `docker compose` with no `-f`.
 
+**Dev prerequisite (once per machine):** `grafana` carries no profile and joins `edge`, so even
+a plain dev `up` needs that network to exist. On a fresh clone, run:
+
+```bash
+docker network create edge     # once per machine; harmless if it already exists
+```
+
 Production therefore **must** name the file explicitly, so the override is never picked up:
 
 ```bash
@@ -132,9 +139,11 @@ cloned there.
 
 The app stack will not start if the external `edge` network does not exist.
 
-`scripts/deploy.sh` automates steps 3 and 5 as a wizard; `scripts/deploy.sh --update` pulls
-the root repo and images (honouring `*_VERSION` pins) and restarts. Equivalent to the raw
-commands — use either.
+`scripts/deploy.sh` automates steps 3 and 5 as a wizard and then **prints** steps 4 and 6 for
+you to run — it does not bring the stack up itself. `scripts/deploy.sh --update` pulls the root
+repo and images (honouring `*_VERSION` pins), creates the external `edge` network if it is
+missing, and restarts the stack — that path is equivalent to running steps 4 and 6 by hand.
+Neither path starts the edge stack; routing/TLS are brought up separately from homelab-infra.
 
 ## Reachable after deploy
 

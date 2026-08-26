@@ -171,9 +171,12 @@ Externally reachable:
 
 Internal-only (no host ports in prod): Postgres, Kafka, MinIO, Prometheus, Loki.
 
-Dev mode (exposes per-service host ports 8081–8086, plus 9090/3001/3100):
+Dev mode (exposes per-service host ports 8081–8086, plus 9090/3001/3100).
+One-time prerequisite: `grafana` joins the external `edge` network, so create it once per
+machine before the first `up`:
 
 ```bash
+docker network create edge     # once per machine; harmless if it already exists
 docker compose --profile app up -d
 ```
 
