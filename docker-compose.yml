@@ -114,7 +114,12 @@ services:
       NOTIFICATIONS_SERVICE_URL: ${NOTIFICATIONS_SERVICE_URL}
       UPLOAD_SERVICE_URL: ${UPLOAD_SERVICE_URL}
       INVESTMENTS_SERVICE_URL: ${INVESTMENTS_SERVICE_URL}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      # Derived from DOMAIN_NAME plus the optional SECONDARY_DOMAIN_NAME so both
+      # hostnames are accepted during a domain migration. Composed here rather
+      # than in .env because .env interpolation is order-dependent and
+      # ALLOWED_ORIGINS is declared above DOMAIN_NAME there. Setting
+      # ALLOWED_ORIGINS explicitly in .env still overrides this.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://${DOMAIN_NAME}${SECONDARY_DOMAIN_NAME:+,https://${SECONDARY_DOMAIN_NAME}},http://localhost}
       INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN}
     depends_on:
       - service-users
@@ -291,7 +296,10 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_ANALYTICS_REPORTING_ENABLED=false
-      - GF_SERVER_ROOT_URL=https://${DOMAIN_NAME}/grafana
+      # Sub-path serving stays on: it makes Grafana emit root-relative asset
+      # URLs, so /grafana works on every hostname the edge routes here. Only
+      # Grafana's own absolute links follow the host below, hence the override.
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-https://${DOMAIN_NAME}/grafana}
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - grafana_data:/var/lib/grafana

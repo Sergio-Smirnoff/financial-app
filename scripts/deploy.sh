@@ -81,10 +81,13 @@ elif [[ ! -f "$ENV_FILE" ]]; then
   sed -i "s/MINIO_ROOT_PASSWORD=.*/MINIO_ROOT_PASSWORD=${MINIO_PASS}/" "$ENV_FILE"
   sed -i "s/JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" "$ENV_FILE"
   sed -i "s/INTERNAL_AUTH_TOKEN=.*/INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN}/" "$ENV_FILE"
-  sed -i "s/DOMAIN_NAME=.*/DOMAIN_NAME=${DOMAIN_NAME}/" "$ENV_FILE"
-  sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://${DOMAIN_NAME},http://localhost|" "$ENV_FILE"
-  sed -i "s|NEXT_PUBLIC_GATEWAY_URL=.*|NEXT_PUBLIC_GATEWAY_URL=https://${DOMAIN_NAME}/api|" "$ENV_FILE"
-  
+  sed -i "s/^DOMAIN_NAME=.*/DOMAIN_NAME=${DOMAIN_NAME}/" "$ENV_FILE"
+  # ALLOWED_ORIGINS and NEXT_PUBLIC_GATEWAY_URL are left exactly as .env.example
+  # ships them: the first interpolates from DOMAIN_NAME (plus the optional
+  # SECONDARY_DOMAIN_NAME) at compose time, the second must stay empty so one
+  # frontend image serves every hostname. Rewriting them here would pin the
+  # deployment to a single host.
+
   success ".env generated successfully."
 else
   info ".env found."
@@ -117,11 +120,12 @@ if $MISSING_VARS; then
         echo "INTERNAL_AUTH_TOKEN=${INTERNAL_AUTH_TOKEN}" >> "$ENV_FILE"
         info "Generated new INTERNAL_AUTH_TOKEN."
     fi
-    # Update URLs to match new domain
+    # ALLOWED_ORIGINS is deliberately not rewritten: overwriting it would drop
+    # any extra hostname added by hand during a domain migration.
     DOMAIN_NAME=$(grep "^DOMAIN_NAME=" "$ENV_FILE" | cut -d'=' -f2-)
-    sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://${DOMAIN_NAME},http://localhost|" "$ENV_FILE"
-    sed -i "s|NEXT_PUBLIC_GATEWAY_URL=.*|NEXT_PUBLIC_GATEWAY_URL=https://${DOMAIN_NAME}/api|" "$ENV_FILE"
     success "Environment updated."
+    warn "Verify ALLOWED_ORIGINS lists every hostname the app is served on"
+    warn "  (set SECONDARY_DOMAIN_NAME to serve a second one alongside ${DOMAIN_NAME})."
   fi
 fi
 
