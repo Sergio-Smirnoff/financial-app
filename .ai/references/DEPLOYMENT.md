@@ -38,11 +38,13 @@ Copy `.env.example` to `.env`. Never commit `.env`.
 | `JWT_ENABLED` | `true` | disables gateway JWT validation — local testing only |
 | `RATE_LIMIT_RPM` | `600` | gateway per-IP limit |
 | `COOKIE_SECURE` | `false` | must be `true` in production |
-| `ALLOWED_ORIGINS` | `https://<domain>,http://localhost` | gateway CORS list |
-| `NEXT_PUBLIC_GATEWAY_URL` | `https://<domain>/api` | baked into the Next.js image at build |
+| `ALLOWED_ORIGINS` | derived — leave empty | gateway CORS list. Empty means compose derives `https://$DOMAIN_NAME[,https://$SECONDARY_DOMAIN_NAME],http://localhost`; a value set here wins outright. TLS terminates at the edge, so the gateway sees `http://gateway:8080` against an `https://<host>` `Origin` and treats even same-host calls as CORS — **every** served hostname must appear here or state-changing requests 403 |
+| `NEXT_PUBLIC_GATEWAY_URL` | empty | must stay empty. The published frontend image is built with no such build-arg, so the bundle inlines an empty base URL and calls the gateway same-origin at `/api` (edge routes `PathPrefix('/api')` to the gateway, no prefix stripping). An empty base is what lets one image serve every hostname; an absolute value would pin the build to one host and yield a broken `/api/api/v1/...` |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | `minioadmin` / `changeme` | object storage |
 | `IOL_USERNAME` / `IOL_PASSWORD` | — | InvertirOnline price feed |
-| `DOMAIN_NAME` | — | public hostname; feeds `ALLOWED_ORIGINS`, `NEXT_PUBLIC_GATEWAY_URL` and `GF_SERVER_ROOT_URL`. Host routing + TLS are configured in the edge stack, not here |
+| `DOMAIN_NAME` | — | primary public hostname; feeds `ALLOWED_ORIGINS` and `GF_SERVER_ROOT_URL`. Host routing + TLS are configured in the edge stack, not here |
+| `SECONDARY_DOMAIN_NAME` | empty | optional second public hostname served alongside `DOMAIN_NAME`. Set during a domain migration so both are accepted at once; purely additive |
+| `GRAFANA_ROOT_URL` | derived from `DOMAIN_NAME` | overrides Grafana's `root_url`. Only Grafana's own absolute links (alert notifications, share links) follow it — the UI keeps serving from `/grafana` on every hostname via `GF_SERVER_SERVE_FROM_SUB_PATH` |
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` | — | notification email |
 | `GRAFANA_ADMIN_PASSWORD` | — | Grafana at `/grafana` |
 | `<SERVICE>_VERSION` | `latest` | pins the GHCR tag per service |
@@ -176,5 +178,6 @@ docker compose -f docker-compose.yml --profile app down
 | Swagger basic-auth always fails | `SWAGGER_AUTH` is configured in the edge stack now — fix it there |
 | Service exits with auth error at boot | `INTERNAL_AUTH_TOKEN` missing |
 | 502 on `/api` | backend still starting or unhealthy, or `gateway` is not on the `edge` network — check `ps`, that service's logs, and `docker network inspect edge` |
-| CORS errors in browser | `ALLOWED_ORIGINS` must include `https://<domain>`; `NEXT_PUBLIC_GATEWAY_URL` must be `https://<domain>/api` |
+| CORS errors in browser | `ALLOWED_ORIGINS` must include `https://<domain>` for **every** hostname served — add the second one via `SECONDARY_DOMAIN_NAME`. `NEXT_PUBLIC_GATEWAY_URL` must be empty |
+| New hostname 403s on login but GETs work | that hostname is missing from `ALLOWED_ORIGINS`. Browsers send `Origin` on same-host non-GET requests and the gateway sees them as CORS |
 | Container OOM-killed | host under-provisioned — compose caps Spring services at 768 MB each |

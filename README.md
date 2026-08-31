@@ -158,6 +158,8 @@ Monitoring (Prometheus/Grafana/Loki/Promtail) is part of the stack and starts au
 ```bash
 # 1. Fill in .env (copy from .env.example), including:
 #    KAFKA_CLUSTER_ID, GRAFANA_ADMIN_PASSWORD, DOMAIN_NAME
+#    Serving a second hostname too? Set SECONDARY_DOMAIN_NAME and leave
+#    ALLOWED_ORIGINS empty — compose then allows both origins.
 # 2. Launch the whole stack (explicit -f bypasses the dev override):
 docker compose -f docker-compose.yml --profile app up -d
 ```
@@ -168,6 +170,10 @@ Externally reachable:
 - Swagger:  `https://${DOMAIN_NAME}/swagger-ui.html` (HTTP basic-auth, enforced by the edge
             stack: `homelab-infra/stacks/edge/dynamic/swagger-auth.yml`)
 - Grafana:  `https://${DOMAIN_NAME}/grafana` (login via `GRAFANA_ADMIN_PASSWORD`)
+
+The same four paths are served on `${SECONDARY_DOMAIN_NAME}` when that variable is set —
+one image, one stack, both hostnames. The frontend calls the gateway same-origin, and
+Grafana keeps its `/grafana` sub-path, so nothing is pinned to a single host.
 
 Internal-only (no host ports in prod): Postgres, Kafka, MinIO, Prometheus, Loki.
 
