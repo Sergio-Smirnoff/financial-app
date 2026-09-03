@@ -2,10 +2,12 @@
 # docker-compose.yml — CANONICAL PRODUCTION stack
 # =============================================================================
 # Prod:  docker compose -f docker-compose.yml --profile app up -d
-#        (explicit -f => docker-compose.override.yml is NOT loaded => no host
-#         ports are published at all; routing/TLS live in the separate edge stack)
-# Dev:   docker compose --profile app up -d
-#        (docker-compose.override.yml auto-loads => host ports exposed per-ms)
+#        (no host ports are published at all; routing/TLS live in the separate
+#         edge stack). A plain `docker compose up` is the same shape — the dev
+#         overlay is opt-in, never auto-loaded.
+# Dev:   docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile app up -d
+#        (docker-compose.dev.yml => host ports exposed per-ms; scripts/dev.sh
+#         sets COMPOSE_FILE so its plain calls get the overlay)
 #
 # Monitoring (prometheus/grafana/loki/promtail) has NO profile => always up.
 # Infra (postgres/kafka/minio) has NO profile => always up.

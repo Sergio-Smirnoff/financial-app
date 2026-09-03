@@ -187,5 +187,5 @@ echo "  Pin versions:        set <SERVICE>_VERSION in .env (e.g. FINANCES_VERSIO
 echo ""
 echo "  Check status:     docker compose -f docker-compose.yml --profile app ps"
 echo ""
-echo "  (Note: In production, do NOT use docker-compose.override.yml or 'dev.sh up')"
+echo "  (Note: In production, do NOT use docker-compose.dev.yml or 'dev.sh up')"
 echo ""
