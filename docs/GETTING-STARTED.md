@@ -13,7 +13,7 @@ service source code:
 
 | What lives here | Examples |
 |---|---|
-| Docker Compose files | `docker-compose.yml` (prod canonical + monitoring), `docker-compose.override.yml` (dev host-port overlay) |
+| Docker Compose files | `docker-compose.yml` (prod canonical + monitoring), `docker-compose.dev.yml` (dev host-port overlay, opt-in) |
 | Dev/deploy scripts | `scripts/dev.sh`, `scripts/deploy.sh` |
 | Infrastructure config | `infra/postgres/init/`, `infra/kafka/` |
 | Documentation | `docs/` (human-readable), `.ai/` (agent context) |
@@ -50,7 +50,7 @@ financial-app/                          ← parent repo (this one)
 ├── .env.example
 ├── .env                                ← you create this (see Section 4)
 ├── docker-compose.yml
-├── docker-compose.override.yml
+├── docker-compose.dev.yml
 ├── scripts/
 │   ├── dev.sh
 │   └── deploy.sh

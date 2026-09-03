@@ -1,14 +1,17 @@
 # =============================================================================
-# docker-compose.override.yml — DEVELOPMENT overlay (auto-loaded)
+# docker-compose.dev.yml — DEVELOPMENT overlay (opt-in, NOT auto-loaded)
 # =============================================================================
-# Docker Compose loads this automatically with the default `docker compose` cmd.
-# It ONLY publishes host ports for local development.
+# Publishes host ports for local development only. It is deliberately NOT
+# named docker-compose.override.yml: the auto-loaded override was applied on
+# the production server twice (2026-08-26, 2026-09-01) and its 9090/3001
+# publishes collided with Cockpit and Uptime Kuma, leaving prometheus and
+# grafana in state `created`.
 #
-# PRODUCTION must bypass this file by passing -f explicitly:
+# Production (no host ports):
 #   docker compose -f docker-compose.yml --profile app up -d
 #
 # Dev (ports exposed):
-#   docker compose --profile app up -d
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile app up -d
 #
 # Swagger UIs (dev, direct to each service):
 #   Users 8081 · Finances 8082 · Banks 8083 · Notifications 8084 ·
