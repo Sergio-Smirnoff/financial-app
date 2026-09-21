@@ -29,6 +29,7 @@ it's ready to build.
 - Fix chart display bug, showing prices that does not exist, graph has no axes and its showing more movements in the curve than the amount of pricies points that the graph has
 
 ### Improvements & refactors
+- **Move Grafana + Loki + Promtail out of this repo into homelab-infra `stacks/observability`** (decided 2026-09-20; Option 1). Prometheus stays here next to the services it scrapes; homelab Grafana reads it over a `link_obs_finance` network. This repo drops the three services (`docker-compose.yml` monitoring block), `infra/monitoring/{grafana,loki-config.yml,promtail-config.yml}`, `GRAFANA_ADMIN_PASSWORD`/`GRAFANA_ROOT_URL`, grafana's `edge` join, `dev.sh monitor`, and the README/DEPLOYMENT/TECH_STACK/.env.example mentions. Spec lives in homelab-infra (`docs/ideas.md` "Centralised log viewer" sketch is the seed), written after the feature-parity P0 plan. `[infra]` `[tech-debt]`
 - Change all the JWT system and the auth tokens
 - refactor some pages of the front end: categories, configuration, uploads
 - Look for @Disable in tests
@@ -97,6 +98,16 @@ it's ready to build.
   those notifications fail TS narrowing. `[ux]` `[tech-debt]`
 - Frontend declares numeric fields as `number` but ms-investments serialises money as `String`
   over the wire — type mismatch for callers. Align frontend types. `[ux]` `[tech-debt]`
+- `TransactionFilters.tsx:26` writes `page` as the string `'1'` while `TransactionsContent.tsx:43` reads it with `parseAsInteger` — harmless today, a trap tomorrow. `[tech-debt]` `[front]`
+- `lib/format/paymentMethod.ts:1-12` is hardcoded Spanish and falls back to `'Débito automático'` for empty input, bypassing next-intl — a silent mislabel. `[ux]` `[front]`
+- `TransactionsContent.tsx:75-78` `handleBulkCategorise` takes a `catId` it never uses and issues no mutation — bulk categorisation is a no-op. `[bug]` `[front]`
+- `npm run i18n:check` compares locales to each other only, never to the keys referenced from code; two missing keys reached production this way. Add a code-usage scan. `[tech-debt]` `[front]`
+- ms-finances `CursorPage` now carries an offset and is no longer only a cursor — rename to a window concept in a dedicated refactor. `[refactor]` `[tech-debt]`
+- ms-finances `TransactionController` builds a `DateRange` only when **both** `from` and `to` are present; a lone bound is silently dropped. `[bug]` `[finances]`
+- `TransactionController.list` performs a second ownership round-trip (line 128) and an N+1 `categoryRepository.findNamesById` per row (lines 130-137). `[tech-debt]` `[finances]`
+- Neither ms-finances nor ms-gateway has a JaCoCo plugin, so R16's "thresholds from each service's pom.xml" does not hold for them; ms-users, ms-notifications and ms-investments do have one. Either add the plugin or amend R16. `[tech-debt]`
+- `parseDecimal`/`parseLong`/`parseInt`/`parseDate` are duplicated across nine BFF use-case impls in ms-gateway — an R4 violation predating this batch. `[refactor]` `[gateway]`
+
 ## In progress / promoted
 
 - Consolidate `Cbu` value object into `commons-core` → resolved 2026-08-05 (`com.financialapp.commons.core.domain.model.Cbu`)
