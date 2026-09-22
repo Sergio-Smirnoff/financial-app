@@ -176,17 +176,23 @@ one image, one stack, both hostnames. The frontend calls the gateway same-origin
 Grafana keeps its `/grafana` sub-path, so nothing is pinned to a single host.
 
 Internal-only (no host ports in prod): Postgres, Kafka, MinIO, Prometheus, Loki.
+(Not fully isolated, though: Prometheus, service-notifications and service-investments also reach the internet through the homelab's isolated `egress` network — see [infra/NETWORKS.md](infra/NETWORKS.md).)
 
 Dev mode (exposes per-service host ports 8081–8086, plus 9090/3001/3100) is an
 explicit overlay — `docker-compose.dev.yml` is not auto-loaded, so a plain
 `docker compose up` is always the production shape.
-One-time prerequisite: `grafana` joins the external `edge` network, so create it once per
-machine before the first `up`:
+One-time prerequisite: this stack joins five networks. `finance_data` is created by this
+stack itself; the other four (`front_finance`, `egress`, `link_backup_finance_pg`,
+`link_backup_finance_minio`) are external and created by `homelab-infra`'s `edge` and
+`backups` stacks — bring those up first, then:
 
 ```bash
-docker network create edge     # once per machine; harmless if it already exists
 docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile app up -d
 ```
+
+On a dev machine without homelab-infra, stand-ins are enough:
+`for n in front_finance egress link_backup_finance_pg link_backup_finance_minio; do docker network create "$n"; done`
+(harmless to re-run; an existing network just errors). Never do this on the server.
 
 ---
 
