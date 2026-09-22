@@ -21,7 +21,7 @@ env-var reference — it wins over this file.
 
 Swagger: aggregated at `http://localhost:8080/swagger-ui.html`; per-service at
 `http://localhost:<port>/swagger-ui.html`, **dev mode only** (those ports exist only via
-`docker-compose.override.yml`).
+`docker-compose.dev.yml`).
 
 ## Environment variables
 
@@ -38,11 +38,13 @@ Copy `.env.example` to `.env`. Never commit `.env`.
 | `JWT_ENABLED` | `true` | disables gateway JWT validation — local testing only |
 | `RATE_LIMIT_RPM` | `600` | gateway per-IP limit |
 | `COOKIE_SECURE` | `false` | must be `true` in production |
-| `ALLOWED_ORIGINS` | `https://<domain>,http://localhost` | gateway CORS list |
-| `NEXT_PUBLIC_GATEWAY_URL` | `https://<domain>/api` | baked into the Next.js image at build |
+| `ALLOWED_ORIGINS` | derived — leave empty | gateway CORS list. Empty means compose derives `https://$DOMAIN_NAME[,https://$SECONDARY_DOMAIN_NAME],http://localhost`; a value set here wins outright. TLS terminates at the edge, so the gateway sees `http://gateway:8080` against an `https://<host>` `Origin` and treats even same-host calls as CORS — **every** served hostname must appear here or state-changing requests 403 |
+| `NEXT_PUBLIC_GATEWAY_URL` | empty | must stay empty. The published frontend image is built with no such build-arg, so the bundle inlines an empty base URL and calls the gateway same-origin at `/api` (edge routes `PathPrefix('/api')` to the gateway, no prefix stripping). An empty base is what lets one image serve every hostname; an absolute value would pin the build to one host and yield a broken `/api/api/v1/...` |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | `minioadmin` / `changeme` | object storage |
 | `IOL_USERNAME` / `IOL_PASSWORD` | — | InvertirOnline price feed |
-| `DOMAIN_NAME` | — | public hostname; feeds `ALLOWED_ORIGINS`, `NEXT_PUBLIC_GATEWAY_URL` and `GF_SERVER_ROOT_URL`. Host routing + TLS are configured in the edge stack, not here |
+| `DOMAIN_NAME` | — | primary public hostname; feeds `ALLOWED_ORIGINS` and `GF_SERVER_ROOT_URL`. Host routing + TLS are configured in the edge stack, not here |
+| `SECONDARY_DOMAIN_NAME` | empty | optional second public hostname served alongside `DOMAIN_NAME`. Set during a domain migration so both are accepted at once; purely additive |
+| `GRAFANA_ROOT_URL` | derived from `DOMAIN_NAME` | overrides Grafana's `root_url`. Only Grafana's own absolute links (alert notifications, share links) follow it — the UI keeps serving from `/grafana` on every hostname via `GF_SERVER_SERVE_FROM_SUB_PATH` |
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` | — | notification email |
 | `GRAFANA_ADMIN_PASSWORD` | — | Grafana at `/grafana` |
 | `<SERVICE>_VERSION` | `latest` | pins the GHCR tag per service |
@@ -79,10 +81,13 @@ schemas. Later `up` runs do not re-execute it.
 
 ## Docker vs local
 
-`docker-compose.override.yml` is **dev-only** and does exactly one thing: publish host ports —
+`docker-compose.dev.yml` is **dev-only** and does exactly one thing: publish host ports —
 infra (5432, 9093, 9000/9001), gateway 8080, frontend 3000, every microservice 8081–8086 so
-per-service Swagger is reachable, and monitoring (9090, 3001, 3100). Compose auto-loads it
-whenever you run plain `docker compose` with no `-f`.
+per-service Swagger is reachable, and monitoring (9090, 3001, 3100). It is **opt-in**: pass it
+with `-f docker-compose.yml -f docker-compose.dev.yml`, or use `scripts/dev.sh`, which exports
+`COMPOSE_FILE` so its plain `docker compose` calls pick it up. (It used to be the auto-loaded
+`docker-compose.override.yml`; that shape reached the production server twice and its 9090/3001
+publishes collided with Cockpit and Uptime Kuma there.)
 
 **Dev prerequisite (once per machine):** `grafana` carries no profile and joins `edge`, so even
 a plain dev `up` needs that network to exist. On a fresh clone, run:
@@ -91,7 +96,7 @@ a plain dev `up` needs that network to exist. On a fresh clone, run:
 docker network create edge     # once per machine; harmless if it already exists
 ```
 
-Production therefore **must** name the file explicitly, so the override is never picked up:
+Production is the plain shape — with or without `-f`, the overlay is never picked up:
 
 ```bash
 docker compose -f docker-compose.yml --profile app up -d
@@ -101,7 +106,7 @@ In production the app stack publishes **no host ports**. The edge stack
 (`homelab-infra/stacks/edge/`) owns 80/443, terminates TLS and routes by host + path prefix
 over the shared `edge` network to `gateway:8080`, `frontend:3000` or `grafana:3000`.
 
-**Never run `docker-compose.override.yml` or `scripts/dev.sh` on a production server.**
+**Never run `docker-compose.dev.yml` or `scripts/dev.sh` on a production server.**
 
 Local hybrid mode — `scripts/dev.sh local-all` — runs infra in Docker and services as local
 JVM processes, overriding `KAFKA_BOOTSTRAP_SERVERS=localhost:9093`, `DB_URL` to
@@ -176,5 +181,6 @@ docker compose -f docker-compose.yml --profile app down
 | Swagger basic-auth always fails | `SWAGGER_AUTH` is configured in the edge stack now — fix it there |
 | Service exits with auth error at boot | `INTERNAL_AUTH_TOKEN` missing |
 | 502 on `/api` | backend still starting or unhealthy, or `gateway` is not on the `edge` network — check `ps`, that service's logs, and `docker network inspect edge` |
-| CORS errors in browser | `ALLOWED_ORIGINS` must include `https://<domain>`; `NEXT_PUBLIC_GATEWAY_URL` must be `https://<domain>/api` |
+| CORS errors in browser | `ALLOWED_ORIGINS` must include `https://<domain>` for **every** hostname served — add the second one via `SECONDARY_DOMAIN_NAME`. `NEXT_PUBLIC_GATEWAY_URL` must be empty |
+| New hostname 403s on login but GETs work | that hostname is missing from `ALLOWED_ORIGINS`. Browsers send `Origin` on same-host non-GET requests and the gateway sees them as CORS |
 | Container OOM-killed | host under-provisioned — compose caps Spring services at 768 MB each |

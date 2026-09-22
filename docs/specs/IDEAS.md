@@ -29,6 +29,7 @@ it's ready to build.
 - Fix chart display bug, showing prices that does not exist, graph has no axes and its showing more movements in the curve than the amount of pricies points that the graph has
 
 ### Improvements & refactors
+- **Move Grafana + Loki + Promtail out of this repo into homelab-infra `stacks/observability`** (decided 2026-09-20; Option 1). Prometheus stays here next to the services it scrapes; homelab Grafana reads it over a `link_obs_finance` network. This repo drops the three services (`docker-compose.yml` monitoring block), `infra/monitoring/{grafana,loki-config.yml,promtail-config.yml}`, `GRAFANA_ADMIN_PASSWORD`/`GRAFANA_ROOT_URL`, grafana's `edge` join, `dev.sh monitor`, and the README/DEPLOYMENT/TECH_STACK/.env.example mentions. Spec lives in homelab-infra (`docs/ideas.md` "Centralised log viewer" sketch is the seed), written after the feature-parity P0 plan. `[infra]` `[tech-debt]`
 - Change all the JWT system and the auth tokens
 - refactor some pages of the front end: categories, configuration, uploads
 - Look for @Disable in tests
@@ -97,6 +98,36 @@ it's ready to build.
   those notifications fail TS narrowing. `[ux]` `[tech-debt]`
 - Frontend declares numeric fields as `number` but ms-investments serialises money as `String`
   over the wire — type mismatch for callers. Align frontend types. `[ux]` `[tech-debt]`
+- `TransactionFilters.tsx:26` writes `page` as the string `'1'` while `TransactionsContent.tsx:43` reads it with `parseAsInteger` — harmless today, a trap tomorrow. `[tech-debt]` `[front]`
+- `lib/format/paymentMethod.ts:1-12` is hardcoded Spanish and falls back to `'Débito automático'` for empty input, bypassing next-intl — a silent mislabel. `[ux]` `[front]`
+- `TransactionsContent.tsx:75-78` `handleBulkCategorise` takes a `catId` it never uses and issues no mutation — bulk categorisation is a no-op. `[bug]` `[front]`
+- `npm run i18n:check` compares locales to each other only, never to the keys referenced from code; two missing keys reached production this way. Add a code-usage scan. `[tech-debt]` `[front]`
+- ms-finances `CursorPage` now carries an offset and is no longer only a cursor — rename to a window concept in a dedicated refactor. `[refactor]` `[tech-debt]`
+- ms-finances `TransactionController` builds a `DateRange` only when **both** `from` and `to` are present; a lone bound is silently dropped. `[bug]` `[finances]`
+- `TransactionController.list` performs a second ownership round-trip (line 128) and an N+1 `categoryRepository.findNamesById` per row (lines 130-137). `[tech-debt]` `[finances]`
+- Neither ms-finances nor ms-gateway has a JaCoCo plugin, so R16's "thresholds from each service's pom.xml" does not hold for them; ms-users, ms-notifications and ms-investments do have one. Either add the plugin or amend R16. `[tech-debt]`
+- `parseDecimal`/`parseLong`/`parseInt`/`parseDate` are duplicated across nine BFF use-case impls in ms-gateway — an R4 violation predating this batch. `[refactor]` `[gateway]`
+
+### Tech-debt — found during live-testing Round B (2026-09-21)
+- A literal `+` in a search term reaches ms-finances as `+` and Tomcat decodes it to a space; encode as `%2B` if literal `+` must be searchable. `[bug]` `[gateway]`
+- `FinancesGatewayImpl`'s `onErrorReturn(Map.of())` renders an upstream 4xx/5xx as an `OK`-but-empty section instead of `UNAVAILABLE`; letting the error reach `Section.guard` would surface it honestly. `[ux]` `[gateway]`
+- `COALESCE(payment_method,'OTHER')` is not sargable; if the filter is used at volume, add an expression index. `[tech-debt]` `[finances]`
+- `TransactionQuery` carries `List<String>`/`String` for what are `CategoryId`, `Cbu` and `PaymentMethod` (R3). Mirroring `PaymentMethod` as a gateway enum would also let the gateway reject a typo'd method instead of forwarding it. `[refactor]` `[gateway]`
+- `CardFigures.toDecimal` is the ninth private copy of `parseDecimal` across the BFF impls (R4, pre-existing). `[refactor]` `[gateway]`
+- `findFiltered`'s SQL is asserted as a string and never executed by an engine; an in-memory execution smoke would catch clause-ordering and dialect mistakes within R16. `[tech-debt]` `[finances]`
+- ms-finances `GlobalExceptionHandler:19-24` maps every `IllegalArgumentException` to `404 resource_not_found`, so any stray bad argument anywhere in the service is reported as a missing resource. `[bug]` `[finances]`
+- `TransactionFilters.tsx:26` binds `page` with a string default while `TransactionsContent.tsx:43` binds the same key with `parseAsInteger`. `[tech-debt]` `[front]`
+- `useQueryState('id')` uses nuqs' default `history: 'replace'`, so browser Back does not close the detail panel; `id` is also not cleared when filters or page change. `[ux]` `[front]`
+- `lib/format/paymentMethod.ts` is hardcoded Spanish and falls back to `'Débito automático'` for empty input, bypassing next-intl. `[ux]` `[front]`
+- `TransactionsContent.tsx:73` `handleBulkCategorise` takes a `catId` it never uses and issues no mutation — bulk categorisation is a no-op. `[bug]` `[front]`
+- `npm run i18n:check` compares locales only, never code usage; two missing keys reached production this way. `[tech-debt]` `[front]`
+- The "reject blank, trim" rule for the `q` search parameter is duplicated three ways: `TransactionController` prechecks blank before constructing `DescriptionQuery`, `DescriptionQuery`'s own constructor rejects blank and trims again, and `SearchTransactionsUseCaseImpl` (the separate `/transactions/search` endpoint) rejects blank and trims a third time. Reify a single search port so the VO owns the rule once. `[refactor]` `[finances]`
+- Beyond `CardFigures.toDecimal`, the other ms-gateway BFF use-case impls each keep a private, near-identical `parseDecimal`/`parseLong`/`parseInt` copy (R4) — dedup alongside the `CardFigures` entry above. `[refactor]` `[gateway]`
+- ms-finances still carries a pre-existing inline comment above the legacy-branch `if` in `TransactionController` (the ms-banks account-scoped callback guard), Javadoc above several domain type declarations (`TransactionKind`, `CategoryId`, `Money`), and two `//` comments inside `TransactionRepositoryImpl.findFiltered` ("Count total elements before applying cursor condition", "Cursor condition") — R9 cleanup, not touched by this round. `[tech-debt]` `[finances]`
+- `TransactionRepositoryImplQueryTest` (ms-finances) declares its `AccountOwnershipGateway` mock with an inline fully-qualified name instead of an import — pre-existing, left untouched by the Round B final fix wave. `[tech-debt]` `[finances]`
+- Orphan budget rows (a budget whose `categoryId` no longer appears in the categories tree, e.g. an archived subcategory) get `BudgetRow.parentId = null` by ruling, so the front still offers "+ Subcategoría" on them; if that category is itself a subcategory, ms-finances 404s. ms-finances' budget payload does not carry the parent id, so fixing this needs the budget to expose it. `[bug]` `[gateway]`
+- `.gitignore`'s bare `AGENTS.md` pattern (ms-finances, ms-gateway, front) matches any file named `AGENTS.md` anywhere in the tree, not just a root-level symlink — it also swallows the real, non-symlink `.ai/AGENTS.md` that carries repo-local load-bearing facts. Task 10 had to `git add -f` it to commit a content change. Scope the pattern to `/AGENTS.md` (root-only) in all three repos. `[tech-debt]` `[infra]`
+
 ## In progress / promoted
 
 - Consolidate `Cbu` value object into `commons-core` → resolved 2026-08-05 (`com.financialapp.commons.core.domain.model.Cbu`)

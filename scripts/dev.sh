@@ -46,6 +46,11 @@ header()  { echo -e "\n${BOLD}${BLUE}═══ $* ═══${RESET}\n"; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
+# Dev overlay is opt-in (docker-compose.dev.yml is NOT auto-loaded), so every
+# plain `docker compose` call in this script gets it here. Commands that pass
+# -f explicitly (cmd_prod) ignore COMPOSE_FILE and stay port-free.
+export COMPOSE_FILE="docker-compose.yml:docker-compose.dev.yml"
+
 # ─── Checks ───────────────────────────────────────────────────────────────────
 check_docker() {
     if ! command -v docker &>/dev/null; then
