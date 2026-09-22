@@ -56,17 +56,29 @@ dynamic DNS live in the separate **edge stack** at `homelab-infra/stacks/edge/`,
 Traefik with the **file provider** (no Docker socket). Consequences:
 
 - App compose publishes **no host port at all** in production. Only the edge stack binds 80/443.
-- `gateway`, `frontend` and `grafana` join the **external `edge` network** under exactly those
-  DNS names — that is what the edge `dynamic/dynamic.yml` service URLs resolve to
-  (`http://gateway:8080`, `http://frontend:3000`, `http://grafana:3000`). Data stores
-  (postgres, kafka, minio, prometheus, loki, promtail) stay on `internal` only.
+- Networks (homelab Phase 20 boundary — full note in `infra/NETWORKS.md`):
+  - `finance_data` — this stack's own backend network, **created here** (`name: finance_data`,
+    `internal: true`, `10.0.61.0/24`). Every service joins it.
+  - `front_finance` (external, homelab `edge` stack) — `gateway`, `frontend` and `grafana`
+    join it under exactly those DNS names; that is what the edge `dynamic/dynamic.yml` service
+    URLs resolve to (`http://gateway:8080`, `http://frontend:3000`, `http://grafana:3000`).
+  - `egress` (external, homelab `edge` stack) — internet access for `prometheus` (host
+    node-exporter at `10.0.250.1:9100`), `service-notifications` (SMTP) and
+    `service-investments` (IOL + FX APIs) only.
+  - `link_backup_finance_pg` / `link_backup_finance_minio` (external, homelab `backups` stack)
+    — `postgres` / `minio` only, for the nightly dump and mirror.
+- **Alias rule (D21):** a container on `egress` *and* `finance_data` must be addressed by its
+  `-int` alias — `prometheus-int`, `service-notifications-int`, `service-investments-int` —
+  never its bare name, or Docker DNS can hand back the icc-blocked `egress` address and the call
+  hangs silently. `.env.example`, the Grafana datasource and `prometheus.yml` already do this.
 - **Changing an app route (host, path prefix, port) requires a matching `dynamic.yml` commit
   in homelab-infra.** There are no `traefik.*` labels in this repo any more; adding some would
   do nothing.
 - Swagger basic-auth is enforced by the edge stack's middleware, so `SWAGGER_AUTH` is an edge
   env var now, not an app one. `ACME_EMAIL`, `DUCKDNS_TOKEN` and `DUCKDNS_DOMAIN` moved there too.
-- Prod bring-up **expects the external `edge` network to already exist**:
-  `docker network create edge` (or bring the edge stack up first). Compose fails fast otherwise.
+- Prod bring-up **expects the four external networks to already exist** — bring homelab-infra's
+  `edge` and `backups` stacks up first. Compose fails fast otherwise. Never hand-create them on
+  the server: homelab-infra owns their subnets and options.
 
 ## Startup flow
 
@@ -89,11 +101,14 @@ with `-f docker-compose.yml -f docker-compose.dev.yml`, or use `scripts/dev.sh`,
 `docker-compose.override.yml`; that shape reached the production server twice and its 9090/3001
 publishes collided with Cockpit and Uptime Kuma there.)
 
-**Dev prerequisite (once per machine):** `grafana` carries no profile and joins `edge`, so even
-a plain dev `up` needs that network to exist. On a fresh clone, run:
+**Dev prerequisite (once per machine):** `grafana` and `prometheus` carry no profile and join
+external networks, so even a plain dev `up` needs them to exist. On a machine without
+homelab-infra, create stand-ins once (never on the server):
 
 ```bash
-docker network create edge     # once per machine; harmless if it already exists
+for n in front_finance egress link_backup_finance_pg link_backup_finance_minio; do
+  docker network create "$n"     # errors harmlessly if it already exists
+done
 ```
 
 Production is the plain shape — with or without `-f`, the overlay is never picked up:
@@ -104,7 +119,7 @@ docker compose -f docker-compose.yml --profile app up -d
 
 In production the app stack publishes **no host ports**. The edge stack
 (`homelab-infra/stacks/edge/`) owns 80/443, terminates TLS and routes by host + path prefix
-over the shared `edge` network to `gateway:8080`, `frontend:3000` or `grafana:3000`.
+over the `front_finance` network to `gateway:8080`, `frontend:3000` or `grafana:3000`.
 
 **Never run `docker-compose.dev.yml` or `scripts/dev.sh` on a production server.**
 
@@ -137,17 +152,19 @@ cloned there.
 3. `cp .env.example .env`, then fill in at minimum `POSTGRES_PASSWORD`, `JWT_SECRET`,
    `INTERNAL_AUTH_TOKEN`, `KAFKA_CLUSTER_ID`, `DOMAIN_NAME`, `GRAFANA_ADMIN_PASSWORD`, and
    `COOKIE_SECURE=true`
-4. Bring up the edge stack (`homelab-infra/stacks/edge/`), which creates the external `edge`
-   network and handles DNS/TLS. Standalone check: `docker network create edge` if it is missing
+4. Bring up homelab-infra's `edge` stack (creates `front_finance` + `egress`, handles DNS/TLS)
+   and `backups` stack (creates `link_backup_finance_pg` + `link_backup_finance_minio`).
+   `finance_data` is created by this stack on its first `up`
 5. `echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-username> --password-stdin`
 6. `docker compose -f docker-compose.yml --profile app up -d`
 
-The app stack will not start if the external `edge` network does not exist.
+The app stack will not start if any of the four external networks is missing.
 
 `scripts/deploy.sh` automates steps 3 and 5 as a wizard and then **prints** steps 4 and 6 for
 you to run — it does not bring the stack up itself. `scripts/deploy.sh --update` pulls the root
-repo and images (honouring `*_VERSION` pins), creates the external `edge` network if it is
-missing, and restarts the stack — that path is equivalent to running steps 4 and 6 by hand.
+repo and images (honouring `*_VERSION` pins), checks the four external networks exist (and
+stops if one is missing — it never creates them), and restarts the stack — equivalent to
+running step 6 by hand.
 Neither path starts the edge stack; routing/TLS are brought up separately from homelab-infra.
 
 ## Reachable after deploy
@@ -159,7 +176,8 @@ Neither path starts the edge stack; routing/TLS are brought up separately from h
 | `https://<domain>/swagger-ui.html` | gateway (aggregated) | basic-auth, enforced by the edge stack |
 | `https://<domain>/grafana` | grafana | `admin` / `GRAFANA_ADMIN_PASSWORD` |
 
-Internal-only in production: Postgres, Kafka, MinIO, Prometheus, Loki, Promtail.
+Internal-only in production: Postgres, Kafka, MinIO, Prometheus, Loki, Promtail (no host
+ports; Prometheus still has outbound access via `egress`, like the two services above).
 
 ## Operations
 
@@ -176,11 +194,12 @@ docker compose -f docker-compose.yml --profile app down
 
 | Symptom | Cause / fix |
 |---|---|
-| `network edge declared as external, but could not be found` | the edge stack is not up. Start it, or `docker network create edge` |
+| `network <name> declared as external, but could not be found` | homelab-infra's `edge` (`front_finance`, `egress`) or `backups` (`link_backup_*`) stack is not up — start it |
+| Grafana "Prometheus: bad gateway" / timeouts, or gateway calls to notifications/investments hang | a caller uses a bare name for a D21 container — use `prometheus-int` / `service-notifications-int` / `service-investments-int` (check the server's `.env`) |
 | Kafka re-formats data on restart | `KAFKA_CLUSTER_ID` not set to a fixed value |
 | Swagger basic-auth always fails | `SWAGGER_AUTH` is configured in the edge stack now — fix it there |
 | Service exits with auth error at boot | `INTERNAL_AUTH_TOKEN` missing |
-| 502 on `/api` | backend still starting or unhealthy, or `gateway` is not on the `edge` network — check `ps`, that service's logs, and `docker network inspect edge` |
+| 502 on `/api` | backend still starting or unhealthy, or `gateway` is not on `front_finance` — check `ps`, that service's logs, and `docker network inspect front_finance` |
 | CORS errors in browser | `ALLOWED_ORIGINS` must include `https://<domain>` for **every** hostname served — add the second one via `SECONDARY_DOMAIN_NAME`. `NEXT_PUBLIC_GATEWAY_URL` must be empty |
 | New hostname 403s on login but GETs work | that hostname is missing from `ALLOWED_ORIGINS`. Browsers send `Origin` on same-host non-GET requests and the gateway sees them as CORS |
 | Container OOM-killed | host under-provisioned — compose caps Spring services at 768 MB each |

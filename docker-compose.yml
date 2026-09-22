@@ -19,7 +19,6 @@ x-java-opts: &java-opts "-Xmx512m -Xms256m -XX:ActiveProcessorCount=2"
 x-spring-service: &spring-base
   profiles: [app]
   restart: unless-stopped
-  networks: [internal]
   depends_on: [postgres, kafka]
   deploy:
     resources:
@@ -53,7 +52,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/init:/docker-entrypoint-initdb.d
     networks:
-      - internal
+      - finance_data
+      - link_backup_finance_pg
     restart: unless-stopped
 
   kafka:
@@ -77,7 +77,7 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
     networks:
-      - internal
+      - finance_data
     restart: unless-stopped
 
   minio:
@@ -90,7 +90,8 @@ services:
     volumes:
       - minio_data:/data
     networks:
-      - internal
+      - finance_data
+      - link_backup_finance_minio
     deploy:
       resources:
         limits:
@@ -131,8 +132,8 @@ services:
       - service-upload
       - service-investments
     networks:
-      - internal
-      - edge
+      - front_finance
+      - finance_data
 
   service-users:
     <<: *spring-base
@@ -152,6 +153,8 @@ services:
       JWT_EXPIRATION: ${JWT_EXPIRATION}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    networks:
+      - finance_data
 
   service-finances:
     <<: *spring-base
@@ -168,6 +171,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
       INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN}
       BANKS_SERVICE_URL: ${BANKS_SERVICE_URL}
+    networks:
+      - finance_data
 
   service-banks:
     <<: *spring-base
@@ -184,6 +189,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
       INTERNAL_AUTH_TOKEN: ${INTERNAL_AUTH_TOKEN}
       INVESTMENTS_SERVICE_URL: ${INVESTMENTS_SERVICE_URL}
+    networks:
+      - finance_data
 
   service-notifications:
     <<: *spring-base
@@ -204,6 +211,12 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       NOTIFICATION_SCHEDULER_CRON: ${NOTIFICATION_SCHEDULER_CRON}
+    # D21: on egress (external SMTP) AND finance_data, so peers must use the
+    # -int alias — the bare name can resolve to the icc-blocked egress address.
+    networks:
+      finance_data:
+        aliases: [service-notifications-int]
+      egress: {}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
       interval: 10s
@@ -234,6 +247,8 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET_STATEMENTS: ${MINIO_BUCKET_STATEMENTS}
       MINIO_BUCKET_RECEIPTS: ${MINIO_BUCKET_RECEIPTS}
+    networks:
+      - finance_data
 
   service-investments:
     <<: *spring-base
@@ -253,6 +268,12 @@ services:
       IOL_PASSWORD: ${IOL_PASSWORD}
       BANKS_SERVICE_URL: ${BANKS_SERVICE_URL}
       FINANCES_SERVICE_URL: ${FINANCES_SERVICE_URL}
+    # D21: on egress (IOL + FX price APIs) AND finance_data, so peers must use
+    # the -int alias — the bare name can resolve to the icc-blocked egress address.
+    networks:
+      finance_data:
+        aliases: [service-investments-int]
+      egress: {}
 
   frontend:
     profiles: [app]
@@ -267,8 +288,8 @@ services:
     depends_on:
       - gateway
     networks:
-      - internal
-      - edge
+      - front_finance
+      - finance_data
     restart: unless-stopped
 
   # ─── Monitoring (no profile → always up) ─────────────────────────────────────
@@ -283,8 +304,13 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=7d'
       - '--storage.tsdb.retention.size=1GB'
+    # D21: on egress (host node-exporter at 10.0.250.1) AND finance_data, so
+    # grafana must use the -int alias — the bare name can resolve to the
+    # icc-blocked egress address.
     networks:
-      - internal
+      finance_data:
+        aliases: [prometheus-int]
+      egress: {}
     deploy:
       resources:
         limits:
@@ -307,8 +333,8 @@ services:
       - grafana_data:/var/lib/grafana
       - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     networks:
-      - internal
-      - edge
+      - front_finance
+      - finance_data
     depends_on:
       - prometheus
       - loki
@@ -326,7 +352,7 @@ services:
       - ./infra/monitoring/loki-config.yml:/etc/loki/local-config.yaml:ro
       - loki_data:/loki
     networks:
-      - internal
+      - finance_data
     deploy:
       resources:
         limits:
@@ -342,7 +368,7 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
-      - internal
+      - finance_data
     deploy:
       resources:
         limits:
@@ -357,8 +383,23 @@ volumes:
   grafana_data:
   loki_data:
 
+# Phase 20 network boundary (homelab-infra). finance_data is this stack's own
+# backend network and is created HERE (name: pinned so it is not prefixed with
+# the project name). The other four are created by homelab-infra — front_finance
+# and egress by its `edge` stack, the link_backup_* pair by its `backups` stack —
+# so those stacks must be up before this one. See infra/NETWORKS.md.
 networks:
-  internal:
-    driver: bridge
-  edge:
+  front_finance:
+    external: true
+  finance_data:
+    name: finance_data
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.0.61.0/24
+  egress:
+    external: true
+  link_backup_finance_pg:
+    external: true
+  link_backup_finance_minio:
     external: true
