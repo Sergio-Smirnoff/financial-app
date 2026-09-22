@@ -23,7 +23,9 @@ Round B (`docs/superpowers/plans/2026-09-21-live-testing-round-b.md`, Tasks 1–
 and made the frontend suite green for the first time since that regression. Task 10 (this report)
 closes the round: it corrects every backend/frontend reference doc the new behaviour invalidated,
 updates both READMEs, routes what deliberately went unfixed into `docs/specs/IDEAS.md`, and writes
-this development report with fresh, pasted gate evidence.
+this development report with fresh, pasted gate evidence. A final whole-branch review then found
+four more items (two Important, two Minor folded in); the **final review fix wave** closed them and
+re-ran every gate — its commits and fresh numbers are recorded below.
 
 ## Connection to plans or specs
 
@@ -36,7 +38,8 @@ this development report with fresh, pasted gate evidence.
 
 ## Diagrams
 
-Branch/commit chain per repo (Task 10's doc commits are the last node in each chain):
+Branch/commit chain per repo (Task 10's doc commits, then the final review fix wave, close each
+chain):
 
 ```
 back/ms-finances   develop@286d82c ─┬ 1309747 fix: union uncategorised with categories
@@ -45,17 +48,26 @@ back/ms-finances   develop@286d82c ─┬ 1309747 fix: union uncategorised with 
                                      ├ 6ed026d fix: reject unknown payment methods
                                      ├ 84dcb83 test: pin legacy account branch guard
                                      ├ db1bf2e test: pin every legacy guard parameter
-                                     └ 9e4e274 docs: record filter and paging rules   (Task 10)
+                                     ├ 9e4e274 docs: record filter and paging rules   (Task 10)
+                                     ├ 9c1b251 test: pin the search contains pattern  (final fix wave)
+                                     ├ e26d640 fix: keep categories if unassigned missing (final fix wave)
+                                     └ 08b9491 docs: note the unassigned fallback      (final fix wave)
 
 back/ms-gateway    develop@e63487a ─┬ e28b1d4 fix: encode downstream query params
                                      ├ 657e0ab fix: list subcategories without budgets
                                      ├ 5b25e00 chore: drop usedBalance and dead code
-                                     └ 1386897 docs: correct BFF reference and ports  (Task 10)
+                                     ├ 1386897 docs: correct BFF reference and ports  (Task 10)
+                                     ├ d3a6277 docs: scope the encoding note          (Task 10 review)
+                                     ├ f786526 feat: expose parentId on budget rows   (final fix wave)
+                                     └ 33b0345 docs: document budget row parentId     (final fix wave)
 
 front/financial-app develop@930ff9b┬ 4184216 fix: keep holding form input on refetch
                                      ├ c4f26c0 test: tighten bugfix assertions
                                      ├ d305e65 fix: validate transaction id route
-                                     └ 0f15a6d docs: record url and degrade contracts (Task 10)
+                                     ├ 0f15a6d docs: record url and degrade contracts (Task 10)
+                                     ├ f2367b4 fix: hide add-subcategory on child rows (final fix wave)
+                                     ├ b42f537 fix: tighten the transaction id route  (final fix wave)
+                                     └ 5c991e5 docs: record parentId and id route rule (final fix wave)
 ```
 
 Category-filter union semantics fixed by Task 1, and the paymentMethod/kind validation fixed by
@@ -67,7 +79,10 @@ flowchart TD
     B -- no --> C["400 validation_error\n(ConstraintViolationException)"]
     B -- yes --> D["categoryIdList = categoryIds\n+ singular categoryId"]
     D --> E{onlyUncategorised?}
-    E -- yes --> F["append the Unassigned\ncategory id to the SAME list"]
+    E -- yes --> U{Unassigned id\nresolvable?}
+    U -- yes --> F["append the Unassigned\ncategory id to the SAME list"]
+    U -- "no, categoryIds empty" --> Z["empty page, no query"]
+    U -- "no, categoryIds given" --> G
     E -- no --> G[categoryIdList unchanged]
     F --> H["WHERE category_id IN (:categoryIds)\n— union, not intersection"]
     G --> H
@@ -99,18 +114,23 @@ Restated verbatim from the plan, each marked `met` / `not-met` / `partial`:
   (`fetchTransactionsDoesNotLetTheQueryInjectExtraParameters`,
   `fetchTransactionsEncodesBracesInsteadOfTreatingThemAsUriVariables`) and `mvn -f
   back/ms-finances/pom.xml verify` (`listRejectsAnUnknownPaymentMethod`,
-  `listRejectsAnUnknownKind`) pass. Hitting `/transactions/abc` on a running stack was **not
-  run**; routed to Follow-ups.
+  `listRejectsAnUnknownKind`) pass. **The "silently empty" clause is not met on the BFF path for an
+  invalid `method`:** ms-finances now answers 400, but `FinancesGatewayImpl.fetchTransactions`
+  ends in `onErrorReturn(Map.of())` (a declared non-goal of this round, already routed to
+  `IDEAS.md`), so the gateway turns that 400 into an `OK` section holding an empty page — the user
+  still sees a silently empty table. G3 is therefore `partial` for that path even once the live
+  check is run. Hitting `/transactions/abc` on a running stack was **not run**; routed to
+  Follow-ups (the route itself is now unit-pinned: `app/(dashboard)/transactions/[id]/__tests__/page.test.ts`).
 - **G4. Input a user has already typed or navigated to survives — a banks refetch does not clear
   the holding form, and a transaction id in the URL opens its panel.** — **partial.** `npm run
   test:run` includes and passes `InvestmentDialogs.test.tsx`'s `keeps typed quantity when the
   banks query returns a new array`. Alt-tabbing mid-entry against a running app was **not run**;
   routed to Follow-ups.
 - **G5. The frontend suite is green for the first time since `fa4dc02`, and Round A's G8 becomes
-  claimable.** — **met.** `npm run test:run` reports `Test Files 64 passed (64)` and `Tests 243
-  passed (243)`, 0 failed (see Verification evidence — the plan text says 242; Task 9 added one
-  more `it()` on top of Task 8's baseline, so 243 is correct and was pasted verbatim from a fresh
-  run). `npm run lint`, `npm run typecheck`, `npm run i18n:check`, `npm run bff:check` and `npm
+  claimable.** — **met.** `npm run test:run` reports `Test Files 66 passed (66)` and `Tests 255
+  passed (255)`, 0 failed, after the final review fix wave (see Verification evidence; Task 10's
+  own run was `64`/`243` — the plan text says 242, Task 9 added one `it()`, and the fix wave added
+  two files and twelve tests). `npm run lint`, `npm run typecheck`, `npm run i18n:check`, `npm run bff:check` and `npm
   run build` all exited 0 in this session.
 - **G6. The regressions this round fixes cannot silently return: every new behaviour fails its
   test when reverted, and the two load-bearing invariants Round A left unguarded are pinned.** —
@@ -119,8 +139,12 @@ Restated verbatim from the plan, each marked `met` / `not-met` / `partial`:
   - Task 4 (`task-4-report.md`): removing `&& page == null` from the legacy-branch guard turned
     `anyFilterParameterLeavesTheLegacyAccountBranch`'s `page` case red
     (`Tests run: 6, Failures: 1`); restored immediately, `git diff` showed no residual change.
-  - `theOffsetComponentIsARowOffsetAndSurvivesReconstruction` is part of the 246 passing tests in
-    this session's fresh `mvn -f back/ms-finances/pom.xml verify` run.
+  - `theOffsetComponentIsARowOffsetAndSurvivesReconstruction` is part of the 249 passing tests in
+    the final fix wave's fresh `mvn -f back/ms-finances/pom.xml verify` run.
+  - Final fix wave: reverting `searchByDescription` to pass the raw query turned
+    `searchByDescriptionPassesAnEscapedContainsPattern` red (`Tests run: 9, Failures: 1`); reverting
+    `/transactions/[id]/page.tsx` to its pre-validation redirect turned 9 of 10 cases of the new
+    route test red. Both reverts undone before commit.
   - Task 7 (`task-7-report.md`): reverting the `usedAmount`/`usedBalance` key swap back to the
     phantom key turned `debt` from `20000.00` to `5000.00` (`OverviewBffTest`,
     `Tests run: 6, Failures: 1`); revert undone before commit.
@@ -192,6 +216,34 @@ Restated verbatim from the plan, each marked `met` / `not-met` / `partial`:
   beside `CardFigures`, and pre-existing R9 comment/Javadoc in ms-finances).
 - This report.
 
+**Final review fix wave (after the whole-branch review):**
+- `9c1b251` (ms-finances) — `TransactionRepositoryImplQueryTest.searchByDescriptionPassesAnEscapedContainsPattern`
+  pins that `/transactions/search` binds `DescriptionQuery.containsPattern()` (`"50%"` →
+  `%50\%%`); before it, reverting to the raw query stayed green and search would have become
+  exact-match.
+- `e26d640` (ms-finances) — `findFiltered` no longer returns an empty page when the Unassigned
+  category cannot be resolved but `categoryIds` were selected; under union semantics it filters by
+  the selected ids alone. With `onlyUncategorised` and no `categoryIds` it still returns an empty
+  page without querying. Two tests pin both branches.
+- `08b9491` (ms-finances) — `API.md` and `README.md` state the fallback.
+- `f786526` (ms-gateway) — `BudgetRow`/`BudgetRowResponse` gained a nullable `parentId`, set on
+  subcategory rows by `GetCategoriesBffUseCaseImpl` and `null` on root and orphan rows;
+  `CategoriesBffTest.subcategoryRowsCarryTheirParentIdAndRootRowsDoNot` pins all three.
+- `33b0345` (ms-gateway) — `API.md` budget-merge note documents `parentId`.
+- `f2367b4` (front) — `openapi/gateway.json` re-dumped from the patched gateway (only diff:
+  `BudgetRowResponse.parentId`), `schema.d.ts` regenerated with `npm run bff:types`, the categories
+  fixture gained a root row and a `parentId`-carrying subcategory row, and `BudgetTab` renders
+  "+ Subcategoría" only when `parentId` is null — it used to show on subcategory rows, where
+  ms-finances' `CreateSubcategoryUseCaseImpl` always 404'd. `BudgetTab.test.tsx` pins it.
+- `b42f537` (front) — `/transactions/[id]` now validates with `/^[1-9]\d{0,15}$/` (rejecting
+  `1e3`, `0x1A`, `" 5 "`, `01`, over-long ids that `Number()` accepted) and redirects with the
+  validated string; `page.test.ts` pins `notFound()` for bad ids and `redirect('/transactions?id=12')`.
+- `5c991e5` (front) — `API_CLIENT.md` documents `parentId` and the id rule; `README.md`'s route row
+  matches the id rule.
+- Parent — this report and `docs/specs/IDEAS.md` (the R9 entry gains the two `//` comments inside
+  `findFiltered`; two new entries: the inline-FQN mock in `TransactionRepositoryImplQueryTest`, and
+  orphan budget rows that are really subcategories).
+
 ## Problems found
 
 Carried over from the plan's "Problems to consider" (all resolved as designed, restated for the
@@ -200,8 +252,9 @@ record):
    both "Sin categorizar" and a real category chip can be active without an always-empty table.
 2. Two response codes changed: unknown `paymentMethod` (silent-ignore → 400) and unknown `kind`
    (404 → 400). Both are intentional and listed under Contract changes.
-3. `BudgetRow` still has a single `name` field — subcategory indentation/grouping would need a
-   `parentId`, deliberately not added.
+3. `BudgetRow` still has a single `name` field. Task 6 left out `parentId`, but the final review
+   showed the front needs it (the add-subcategory action was offered on child rows and always
+   failed), so the final fix wave added it — see Contract changes.
 4. `DescriptionQuery` touches both `TransactionFilter` and `TransactionFilterCommand`, and the
    JPQL escape change also affects `/transactions/search`; verified via the full `mvn verify` run
    (both `TransactionRepositoryImplQueryTest` and `SearchTransactionsUseCaseImplTest` pass).
@@ -241,6 +294,17 @@ New, found while writing this task's docs:
 | front/financial-app | hotfix/live-testing-round-b | `c4f26c0` test(front): tighten bugfix assertions |
 | front/financial-app | hotfix/live-testing-round-b | `d305e65` fix(front): validate transaction id route |
 | front/financial-app | hotfix/live-testing-round-b | `0f15a6d` docs(front): record url and degrade contracts |
+| back/ms-gateway | hotfix/live-testing-round-b | `d3a6277` docs(gateway): scope the encoding note |
+| financial-app (parent) | hotfix/live-testing-round-b | `310cfae` docs: report live-testing round B |
+| **Final review fix wave** | | |
+| back/ms-finances | hotfix/live-testing-round-b | `9c1b251` test(finances): pin the search contains pattern |
+| back/ms-finances | hotfix/live-testing-round-b | `e26d640` fix(finances): keep categories if unassigned missing |
+| back/ms-finances | hotfix/live-testing-round-b | `08b9491` docs(finances): note the unassigned fallback |
+| back/ms-gateway | hotfix/live-testing-round-b | `f786526` feat(gateway): expose parentId on budget rows |
+| back/ms-gateway | hotfix/live-testing-round-b | `33b0345` docs(gateway): document budget row parentId |
+| front/financial-app | hotfix/live-testing-round-b | `f2367b4` fix(front): hide add-subcategory on child rows |
+| front/financial-app | hotfix/live-testing-round-b | `b42f537` fix(front): tighten the transaction id route |
+| front/financial-app | hotfix/live-testing-round-b | `5c991e5` docs(front): record parentId and id route rule |
 | financial-app (parent) | hotfix/live-testing-round-b | *(this report + IDEAS.md — committed after this file is written)* |
 
 Task 10's own file changes:
@@ -253,41 +317,44 @@ Task 10's own file changes:
 
 ## Verification evidence
 
-**`mvn -f back/ms-finances/pom.xml verify`** (fresh run, this session):
+All gate output below is from fresh runs after the final review fix wave (2026-09-22), superseding
+Task 10's numbers (246 / 114 backend tests, 64 files / 243 frontend tests).
+
+**`mvn -f back/ms-finances/pom.xml verify`**:
 ```
 [INFO] Running com.financialapp.finances.architecture.LayeredArchitectureTest
-[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.574 s -- in com.financialapp.finances.architecture.LayeredArchitectureTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.561 s -- in com.financialapp.finances.architecture.LayeredArchitectureTest
 [INFO]
 [INFO] Results:
 [INFO]
-[INFO] Tests run: 246, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 249, Failures: 0, Errors: 0, Skipped: 0
 [INFO]
 [INFO] --- spring-boot:3.4.2:repackage (repackage) @ ms-finances ---
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  7.947 s
+[INFO] Total time:  8.741 s
 ```
 
-**`mvn -f back/ms-gateway/pom.xml verify`** (fresh run, this session):
+**`mvn -f back/ms-gateway/pom.xml verify`**:
 ```
 [INFO] Running com.financialapp.gateway.architecture.LayeredArchitectureTest
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.941 s -- in com.financialapp.gateway.architecture.LayeredArchitectureTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.180 s -- in com.financialapp.gateway.architecture.LayeredArchitectureTest
 [INFO]
 [INFO] Results:
 [INFO]
-[INFO] Tests run: 114, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 115, Failures: 0, Errors: 0, Skipped: 0
 [INFO]
 [INFO] --- spring-boot:3.4.2:repackage (repackage) @ ms-gateway ---
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  4.423 s
+[INFO] Total time:  12.618 s
 ```
 
-**`npm run lint`** (front/financial-app, fresh run, this session) — `EXIT:0`. Only pre-existing
-warnings (`@typescript-eslint/no-unused-vars`, `react-hooks/exhaustive-deps`, one
-`jsx-a11y/role-has-required-aria-props`), zero errors, no ESLint failure.
+**`npm run lint`** (front/financial-app) — `EXIT:0`. 31 pre-existing warnings
+(`@typescript-eslint/no-unused-vars`, `react-hooks/exhaustive-deps`, one
+`jsx-a11y/role-has-required-aria-props`), none in a file the fix wave touched, zero errors.
 
 **`npm run typecheck`** — `EXIT:0` (`tsc --noEmit`, no output).
 
@@ -299,16 +366,16 @@ i18n OK — 682 keys
 **`npm run bff:check`** — `EXIT:0`:
 ```
 ✨ openapi-typescript 7.13.0
-🚀 openapi/gateway.json → /tmp/schema.check.d.ts [46.9ms]
+🚀 openapi/gateway.json → /tmp/schema.check.d.ts [61ms]
 ```
 (`diff -q` against `lib/api/bff/schema.d.ts` reported no difference.)
 
 **`npm run test:run`** — `EXIT:0`:
 ```
- Test Files  64 passed (64)
-      Tests  243 passed (243)
-   Start at  16:56:41
-   Duration  11.69s (transform 3.80s, setup 8.44s, import 68.73s, tests 24.72s, environment 44.67s)
+ Test Files  66 passed (66)
+      Tests  255 passed (255)
+   Start at  17:19:19
+   Duration  14.05s (transform 5.13s, setup 10.00s, import 83.56s, tests 29.30s, environment 51.16s)
 ```
 
 **`npm run build`** — `EXIT:0`. All 14 routes compiled (`/transactions/[id]` present as dynamic
@@ -318,7 +385,7 @@ Route (app)                                 Size  First Load JS
 ┌ ○ /                                    2.72 kB         207 kB
 ├ ○ /_not-found                          1.01 kB         103 kB
 ├ ○ /banks                               55.9 kB         300 kB
-├ ○ /categories                          14.5 kB         245 kB
+├ ○ /categories                          14.6 kB         245 kB
 ├ ○ /design-preview                      11.7 kB         242 kB
 ├ ○ /imports                             14.5 kB         207 kB
 ├ ○ /investments                         11.5 kB         259 kB
@@ -349,8 +416,16 @@ Route (app)                                 Size  First Load JS
   mutually exclusive with `cursorAfter`. `page` is honoured only when `cursor` is absent.
 - **`GetCategoriesBffUseCaseImpl` now emits a `BudgetRow` for every category and subcategory**,
   budgeted or not (previously only categories with a matching budget appeared). Subcategory rows
-  carry a synthetic `"<parent name> / <child name>"` in `BudgetRow.name` — no new field, no
-  `parentId`.
+  carry a synthetic `"<parent name> / <child name>"` in `BudgetRow.name`.
+- **`BudgetRow` / `BudgetRowResponse` gained a nullable `parentId` (Long)** (final fix wave) —
+  additive and backward-compatible: the parent category's id on subcategory rows, `null` on
+  root-category rows and on orphan budget rows. `openapi/gateway.json` and `schema.d.ts` in the
+  front were regenerated for it. The front uses it to offer "+ Subcategoría" on root rows only.
+- **`GET /api/v1/finances/transactions` — `onlyUncategorised` with an unresolvable Unassigned
+  category** (final fix wave): with `categoryIds` it now filters by those ids alone instead of
+  returning an empty page; alone it still returns an empty page.
+- **Frontend `/transactions/[id]`** (final fix wave) accepts only `/^[1-9]\d{0,15}$/`; ids such as
+  `1e3`, `0x1A`, `" 5 "` or `01`, which `Number()` used to accept, now 404.
 - **`CardFigures.usedAmount` no longer falls back to the `usedBalance` key.** ms-banks never sent
   that key; the fallback was dead code that could mask a real `usedAmount` regression. Any caller
   still relying on `usedBalance` will now see `0` instead of a phantom figure.
@@ -378,13 +453,16 @@ Not routed to IDEAS.md, but explicitly open from this task:
 
 ## Results
 
-Round B closes all 7 MAJOR findings from the Round A review with unit/slice-test evidence, and
-the frontend suite is green (`Test Files 64 passed (64)`, `Tests 243 passed (243)`) for the first
-time since `fa4dc02` — Round A's G8 is now claimable. Both backend services build and verify
-green (246 and 114 tests respectively, 0 failures). All reference docs Round A left stale or wrong
+Round B closes all 7 MAJOR findings from the Round A review with unit/slice-test evidence, plus
+the four items of the final whole-branch review, and the frontend suite is green (`Test Files 66
+passed (66)`, `Tests 255 passed (255)`) for the first time since `fa4dc02` — Round A's G8 is now
+claimable. Both backend services build and verify green (249 and 115 tests respectively, 0
+failures). All reference docs Round A left stale or wrong
 are corrected across the three service repos, and the backlog now records exactly what this round
-deliberately left unfixed. The only gap against the plan's own goals is the live-app manual
-verification clause on G1–G4, which no task in this round executed.
+deliberately left unfixed. The gaps against the plan's own goals are the live-app manual
+verification clause on G1–G4, which no task in this round executed, and G3's BFF path for an
+invalid `method`, which stays silently empty until the gateway's `onErrorReturn(Map.of())` is
+replaced (routed to `IDEAS.md`).
 
 ## Other references
 
