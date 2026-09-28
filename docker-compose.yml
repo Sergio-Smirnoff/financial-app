@@ -211,6 +211,7 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       NOTIFICATION_SCHEDULER_CRON: ${NOTIFICATION_SCHEDULER_CRON}
+      FINANCES_SERVICE_URL: ${FINANCES_SERVICE_URL}
     # D21: on egress (external SMTP) AND finance_data, so peers must use the
     # -int alias — the bare name can resolve to the icc-blocked egress address.
     networks:
