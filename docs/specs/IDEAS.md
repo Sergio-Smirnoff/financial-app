@@ -110,10 +110,9 @@ it's ready to build.
 
 ### Tech-debt — found during live-testing Round B (2026-09-21)
 - A literal `+` in a search term reaches ms-finances as `+` and Tomcat decodes it to a space; encode as `%2B` if literal `+` must be searchable. `[bug]` `[gateway]`
-- `FinancesGatewayImpl`'s `onErrorReturn(Map.of())` renders an upstream 4xx/5xx as an `OK`-but-empty section instead of `UNAVAILABLE`; letting the error reach `Section.guard` would surface it honestly. `[ux]` `[gateway]`
+- `FinancesGatewayImpl`'s `onErrorReturn(Map.of())` renders an upstream 4xx/5xx as an `OK`-but-empty section instead of `UNAVAILABLE`; letting the error reach `Section.guard` would surface it honestly. Closed for `fetchTransactionById` in Round C1; the other fetches remain (see the Round C1 entry on gateway adapters). `[ux]` `[gateway]`
 - `COALESCE(payment_method,'OTHER')` is not sargable; if the filter is used at volume, add an expression index. `[tech-debt]` `[finances]`
 - `TransactionQuery` carries `List<String>`/`String` for what are `CategoryId`, `Cbu` and `PaymentMethod` (R3). Mirroring `PaymentMethod` as a gateway enum would also let the gateway reject a typo'd method instead of forwarding it. `[refactor]` `[gateway]`
-- `CardFigures.toDecimal` is the ninth private copy of `parseDecimal` across the BFF impls (R4, pre-existing). `[refactor]` `[gateway]`
 - `findFiltered`'s SQL is asserted as a string and never executed by an engine; an in-memory execution smoke would catch clause-ordering and dialect mistakes within R16. `[tech-debt]` `[finances]`
 - ms-finances `GlobalExceptionHandler:19-24` maps every `IllegalArgumentException` to `404 resource_not_found`, so any stray bad argument anywhere in the service is reported as a missing resource. `[bug]` `[finances]`
 - `TransactionFilters.tsx:26` binds `page` with a string default while `TransactionsContent.tsx:43` binds the same key with `parseAsInteger`. `[tech-debt]` `[front]`
@@ -122,11 +121,34 @@ it's ready to build.
 - `TransactionsContent.tsx:73` `handleBulkCategorise` takes a `catId` it never uses and issues no mutation — bulk categorisation is a no-op. `[bug]` `[front]`
 - `npm run i18n:check` compares locales only, never code usage; two missing keys reached production this way. `[tech-debt]` `[front]`
 - The "reject blank, trim" rule for the `q` search parameter is duplicated three ways: `TransactionController` prechecks blank before constructing `DescriptionQuery`, `DescriptionQuery`'s own constructor rejects blank and trims again, and `SearchTransactionsUseCaseImpl` (the separate `/transactions/search` endpoint) rejects blank and trims a third time. Reify a single search port so the VO owns the rule once. `[refactor]` `[finances]`
-- Beyond `CardFigures.toDecimal`, the other ms-gateway BFF use-case impls each keep a private, near-identical `parseDecimal`/`parseLong`/`parseInt` copy (R4) — dedup alongside the `CardFigures` entry above. `[refactor]` `[gateway]`
 - ms-finances still carries a pre-existing inline comment above the legacy-branch `if` in `TransactionController` (the ms-banks account-scoped callback guard), Javadoc above several domain type declarations (`TransactionKind`, `CategoryId`, `Money`), and two `//` comments inside `TransactionRepositoryImpl.findFiltered` ("Count total elements before applying cursor condition", "Cursor condition") — R9 cleanup, not touched by this round. `[tech-debt]` `[finances]`
 - `TransactionRepositoryImplQueryTest` (ms-finances) declares its `AccountOwnershipGateway` mock with an inline fully-qualified name instead of an import — pre-existing, left untouched by the Round B final fix wave. `[tech-debt]` `[finances]`
 - Orphan budget rows (a budget whose `categoryId` no longer appears in the categories tree, e.g. an archived subcategory) get `BudgetRow.parentId = null` by ruling, so the front still offers "+ Subcategoría" on them; if that category is itself a subcategory, ms-finances 404s. ms-finances' budget payload does not carry the parent id, so fixing this needs the budget to expose it. `[bug]` `[gateway]`
 - `.gitignore`'s bare `AGENTS.md` pattern (ms-finances, ms-gateway, front) matches any file named `AGENTS.md` anywhere in the tree, not just a root-level symlink — it also swallows the real, non-symlink `.ai/AGENTS.md` that carries repo-local load-bearing facts. Task 10 had to `git add -f` it to commit a content change. Scope the pattern to `/AGENTS.md` (root-only) in all three repos. `[tech-debt]` `[infra]`
+
+### Tech-debt — found during live-testing Round C1 (2026-09-28)
+- `GetImportsBffUseCaseImpl`, `GetLoansBffUseCaseImpl`, `CardFigures.toDecimal` and `LoanScheduleSupport.as*` still keep private parse helpers (`parseDecimal`/`parseLong`/`parseInt` copies, R4) — migrate them to `DownstreamPayload`. Supersedes the Round B `CardFigures.toDecimal` and per-impl `parseDecimal` entries. `[refactor]` `[gateway]`
+- Every other gateway adapter still `onErrorReturn`s, and list-returning ones (`InvestmentsGatewayImpl.fetchHoldings`/`fetchPortfolioEvolution`, `FinancesGatewayImpl` list fetches, `NotificationsGatewayImpl.fetchLatest`) turn a 5xx into `[]`, shown as an OK-but-empty table instead of `UNAVAILABLE`. Part B fixed the wealth inputs; the rest need their own pass. `[ux]` `[gateway]`
+- `ms-upload` `GET /runs/by-transaction/{transactionId}` (`StatementController.java:195-204`) takes no `X-User-Id` and checks no ownership — any user can read any transaction's import run — scheduled: separate security hotfix right after C1 merges (user ruling D10, 2026-09-28). `[security]` `[upload]`
+- Sessions never report `current=true` through the BFF: `SessionController` derives it from the `access_token` cookie, which `UsersGatewayImpl.fetchSessions` does not forward. `[bug]` `[gateway]`
+- Fee rows hold one amount/percentage and no concept: transfer fee, card international surcharge, broker sell/market % are dropped; `debitCreditTaxRate` is hard-coded `0.006` although `UserFeesResponse.accounts[].debitCreditTaxRate` carries it. `[ux]` `[gateway]`
+- `PortfolioWebMapper.toPositionSearchResponse` labels the cost basis `marketValue`. `[bug]` `[investments]`
+- `BalanceSnapshotScheduler` (ms-banks) swallows per-user failures with no count or summary line, like the portfolio job did. `[tech-debt]` `[banks]`
+- `FxRateController.java:47` `FxView.valueOf(view.toUpperCase())` turns an unknown view into an `IllegalArgumentException` instead of a 400 `invalid_request`. `[bug]` `[investments]`
+- Evolution has no cost series (snapshots store value only); store `totalCost` per currency in `portfolio_snapshots.totals` while the table is still young. `[feature]` `[investments]`
+- `CardFigures.usedPercent` keeps its own 4-dp percentage formula; route it through `Percentages.percentOf` when Part B rewrites card figures. `[refactor]` `[gateway]`
+- Investment evolution converts every day at today's rate; Part B's per-day MEP should also serve this series. `[ux]` `[gateway]`
+- `ImportRunResponse` has no `fileName`, so the Imports and transaction-detail BFFs cannot show one. `[feature]` `[upload]`
+- `GetImportsBffUseCaseImpl.java:55-56` counts `PENDING`/`PARTIAL`/`UNDONE` runs as active. `[bug]` `[gateway]`
+- The gateway's `ManualCurrencyRateResponse` was not checked against ms-users `/me/currency-rates` in the Round C1 audit. `[tech-debt]` `[gateway]`
+- Investment alerts are filtered client-side inside `/notifications/latest`; other notification types can crowd older threshold alerts out — add a server-side type filter. `[ux]` `[notifications]`
+- USD view round-trips USD→ARS(buy)→USD(sell), drifting USD-only totals by the spread. `[ux]` `[gateway]`
+- Gateway infra DTOs `HoldingResponse.symbol`, `AccountResponse.id/name` never match the real payloads (only `currency` is read). `[tech-debt]` `[gateway]`
+- `StatusErrorCodes.codeFor` maps downstream 403/409/422 to code `internal_error` (HTTP status kept). `[bug]` `[gateway]`
+- `PortfolioFigures.usdRate` is fetched twice in the ARS view (summary + evolution); share one future. `[perf]` `[gateway]`
+- Bond `currentPrice` unit inconsistency (per-100 quote vs per-1 average cost when unpriced) — Part A must label/handle it. `[ux]` `[investments]`
+- `UpdateHoldingUseCaseImpl` does not check that an edited ticker's price currency matches the holding currency. `[bug]` `[investments]`
+- DDD audit (Task 16) pre-existing findings: `ms-gateway domain/service/MoneyConversion.java` is dead code, a second USD/ARS conversion beside `BffMoneyConverter` (R4) `[refactor]` `[gateway]`; `GetPortfolioSummaryUseCaseImpl.buildBreakdown:72-76` duplicates percentage arithmetic `[refactor]` `[investments]`; use cases `new BrokerFeeNetting()` in CloseHolding/CreateHolding/GetHoldingDetail instead of injecting the domain service `[refactor]` `[investments]`; gateway ports expose raw `Map<String,Object>` and `PortfolioSummary` keys asset type by bare String (R3, low) `[refactor]` `[gateway]`.
 
 ## In progress / promoted
 
