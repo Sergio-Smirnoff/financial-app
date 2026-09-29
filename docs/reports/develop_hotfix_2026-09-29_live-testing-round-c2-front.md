@@ -71,7 +71,7 @@ Statuses reflect local evidence only. **No live check (LC1-LC4) has run: they ne
 | Goal | Status | Evidence / what is missing |
 |---|---|---|
 | G1 | partial | Local half met: front 277/277 including `keeps a deep-linked search and page untouched on mount`, `stays on the page it moves to`, and the e2e `Movimientos keeps a deep-linked search and filters by several categories` (passed, Task 8 Step 3). Missing: LC1 on prod. |
-| G2 | partial | Local half met: `MultiSelectFilter`/`TransactionFilters` tests green; Task 8 union check `categories=none,1109` gave total 1 = 0 (`categories=1109`) + 1 (`categories=none`). **Weak evidence: the Supermercado id used (1109) has 0 movements, so 1 = 0 + 1 holds arithmetically but does not exercise a union of two non-empty sets.** Missing: LC2 on prod. |
+| G2 | partial | Local half met: `MultiSelectFilter`/`TransactionFilters` tests green; Task 8 union check `categories=none,1109` gave total 1 = 0 (`categories=1109`) + 1 (`categories=none`). That id (1109) had 0 movements, so a follow-up check with non-empty categories was run (below): `none,1107` 55 = 54 + 1, `none,1106` 54 = 53 + 1, `1106,1107` 107 = 53 + 54. Missing: LC2 on prod. |
 | G3 | met | `npm run e2e:live` printed `10 passed (22.4s)` (Task 8 Step 3, below), on the local DB that still holds duplicate demo categories. The front README procedure reaches the gateway (dev overlay). |
 | G4 | partial | Gateway `mvn clean verify` 187/0/0 (`CategoriesBffTest` rule cases); front 277/277 (`shows how many movements each rule has categorised, and no priority`); Task 8 rules check gave `matchCount` int, `hasPriority: false`. Only one demo rule (COTO to Supermercado, created locally, matchCount 0), so the value shown was 0. Missing: LC3 on prod. |
 | G5 | partial | Gateway tests green (`UsersGatewayImplTest`, `SettingsBffTest`, `BffRouteTest` cookie cases, 187/0/0); `SecuritySection.test.tsx` both new tests green; Task 8 sessions check `{"current": 1, "hasIp": false}`; e2e `Ajustes` passed. Missing: LC4 on prod. |
@@ -173,7 +173,14 @@ CAT=1109
 1                                     # categories=none only
 ```
 
-Union: 1 == 0 + 1, pass (weak evidence: category 1109 has 0 movements). Rules were empty, so one rule was created for the local demo user:
+Union: 1 == 0 + 1, pass (category 1109 has 0 movements, so re-checked with non-empty categories after the review):
+
+```
+X=1107: none,X=55 X=54 none=1
+X=1106: none,X=54 X=53 none=1
+1106,1107=107
+```
+ Rules were empty, so one rule was created for the local demo user:
 
 ```
 POST /api/v1/finances/categorization-rules {"matchType":"CONTAINS","pattern":"COTO","categoryId":1109}
@@ -212,7 +219,7 @@ Running 10 tests using 1 worker
 - T4: gateway `mvn verify` 180/0/0. T5: RED compilation error captured; `mvn -o verify` 186/0/0.
 - T6: RED `Unable to find role="columnheader" and name "Veces aplicada"`; 275/275. T7: RED 1 failed; 277/277.
 
-**Not run:** LC1-LC4 (Task 14, needs production).
+**Not run:** LC1-LC5 (Task 14, needs production; LC5 = `grep -c "Downstream contract violation"` on the gateway logs, expected 0).
 
 ## Contract changes
 
@@ -224,7 +231,7 @@ Running 10 tests using 1 worker
 - Catalogue: `transactions.filters.search` and `transactions.filters.categoriesSelected` added; `categories.rules.priority` renamed to `categories.rules.timesApplied`.
 - `SearchBar` takes no props.
 - Generated `openapi/gateway.json` `servers[0].url` flipped 8090 to 8080 (cosmetic, ruled).
-- No migrations, no Kafka schema changes, no ms-users or ms-finances changes. Front and gateway must ship together (an old front against the new gateway loses the rule count; a new front against an old gateway shows no `matchCount` and no current session).
+- No migrations, no Kafka schema changes, no ms-users or ms-finances changes. Deploy the gateway before the front, or both together (an old front against the new gateway loses the rule count; a new front against an old gateway shows no `matchCount` and no current session). **Never roll the gateway back to 1.3.0 alone while the new front is live:** no session would be marked current, so the user's own session shows a revoke button that signs them out.
 
 ## Follow-ups and deferred work
 
@@ -233,11 +240,11 @@ Routed to `docs/specs/IDEAS.md` (commit `13b4e25`, C2 section; the two `Transact
 - D1 omnibar routing free text to `/transactions?q=`; D2 accent-insensitive search in ms-finances (`cafe` vs `Café`); D4 local demo DB duplicates (local-only reset is the user's call, R15) plus the COTO demo rule sentence; D5 parent category not including subcategories; D7 ms-users keeps every session (131 for the demo user); D8 debounce for search.
 - Review and audit minors: `UncategorisedBanner` hard-coded href; duplicate or blank category ids in a hand-edited URL; the four T10 pre-existing DDD items (split into 3 entries); `Math.toIntExact` throwing `ArithmeticException` instead of a contract violation (unreachable); `MultiSelectFilter` untick removing all duplicate copies (unreachable via UI); `TransactionsContent.test.tsx:551` `release()` outside try/finally; `live-smoke.spec.ts:87` `.first()` workaround.
 - **Task 11 Step 3 and its minors:** `UI_STATE.md` URL State row is missing a separator after `<NuqsAdapter>`, and the `keepPreviousData` note sits under the Zustand section. Left as is; fix in a docs touch-up.
-- **Process (the user's):** Task 13, merge to `develop` locally; Task 14, PRs, release, deploy, then LC1-LC4 on production (which move G1, G2, G4, G5 from `partial` to `met`). Nothing was merged or pushed. Part A branches from `develop` after this round merges.
+- **Process (the user's):** Task 13, merge to `develop` locally; Task 14, PRs, release, deploy, then LC1-LC5 on production (which move G1, G2, G4, G5 from `partial` to `met`). Nothing was merged or pushed. Part A branches from `develop` after this round merges.
 
 ## Results
 
-Local evidence is green: gateway 187/0/0, front 277/277, `i18n:check` 684 keys, `bff:check` exit 0, build ok, `e2e:live` 10 passed, final review merge-ready (0 Critical, 0 Important), DDD audit clean. G3 and G6 are met; G1, G2, G4, G5 are `partial` until the production live checks run after release and deploy. G2's local union check is weak (category with 0 movements). Nothing is merged, pushed or released.
+Local evidence is green: gateway 187/0/0, front 277/277, `i18n:check` 684 keys, `bff:check` exit 0, build ok, `e2e:live` 10 passed, final review merge-ready (0 Critical, 0 Important), DDD audit clean. G3 and G6 are met; G1, G2, G4, G5 are `partial` until the production live checks run after release and deploy. G2's local union holds with non-empty categories (55 = 54 + 1, 107 = 53 + 54). Nothing is merged, pushed or released.
 
 ## Other references
 
