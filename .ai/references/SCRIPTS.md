@@ -79,7 +79,9 @@ Dumps `ms-gateway`'s `/v3/api-docs` to `front/financial-app/openapi/gateway.json
 
 ## `seed-demo-user.sh` — deterministic demo user seed
 
-Seeds standard demo user data (`demo@financial.app` / `Demo!2026pass`) across accounts, credit cards, categories, transactions, budgets, loans, and import runs. Idempotent. Prerequisites: backend stack running.
+Seeds standard demo user data (`demo@financial.app` / `Demo!2026pass`) across accounts, credit cards, categories, transactions, budgets, loans, and import runs. Prerequisites: backend stack running, `jq`, and GNU `date` (the previous-month calculation uses `date -d`).
+
+Idempotent by natural key (CBU, card number, category name, description+date+amount, loan name, import period, ticker): each entity is looked up before it is created. Transactions match only on the exact description + date + amount triple. A run in a new month adds that month's dated rows once. A failed lookup aborts the run: a jq error or an HTTP failure is never read as "absent", so it cannot cause a duplicate insert. Scratch files live in a `mktemp -d` directory removed on exit.
 
 ## `capture-bff-payloads.sh` — BFF fixture capture
 
