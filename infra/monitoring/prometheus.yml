@@ -2,6 +2,8 @@ global:
   scrape_interval: 30s
 
 scrape_configs:
+  # service-notifications and service-investments sit on egress + finance_data,
+  # so they are scraped by their -int alias (D21, see infra/NETWORKS.md).
   - job_name: 'financial-app'
     metrics_path: '/actuator/prometheus'
     static_configs:
@@ -10,16 +12,10 @@ scrape_configs:
           - 'service-users:8081'
           - 'service-finances:8082'
           - 'service-banks:8083'
-          - 'service-notifications:8084'
+          - 'service-notifications-int:8084'
           - 'service-upload:8085'
-          - 'service-investments:8086'
+          - 'service-investments-int:8086'
 
-  # Host + container metrics from the homelab-infra `dashboard` stack.
-  # Scraped via the host LAN IP on purpose: no shared docker network,
-  # the exporters bind 192.168.0.218 only (see stacks/dashboard/README.md).
   - job_name: 'node'
     static_configs:
-      - targets: ['192.168.0.218:9100']
-  - job_name: 'cadvisor'
-    static_configs:
-      - targets: ['192.168.0.218:9101']
+      - targets: ['10.0.250.1:9100']   # node-exporter binds the homelab egress gateway (homelab-infra stacks/dashboard)

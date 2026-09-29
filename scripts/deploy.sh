@@ -32,6 +32,11 @@ fi
 # Production compose = base + pinned-version overlay
 COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.prod.yml)
 
+# External networks owned by homelab-infra (Phase 20): front_finance + egress
+# come from its `edge` stack, the link_backup_* pair from its `backups` stack.
+# finance_data is NOT listed — this stack creates it itself.
+EXTERNAL_NETWORKS=(front_finance egress link_backup_finance_pg link_backup_finance_minio)
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -159,10 +164,19 @@ fi
 if $UPDATE_MODE; then
   info "Pulling app images (pinned in docker-compose.prod.yml) ..."
   docker compose "${COMPOSE_FILES[@]}" --profile app pull
-  # Routing/TLS live in the homelab-infra edge stack; the app only joins its
-  # network. Compose refuses to start if the external network is absent.
-  info "Ensuring external 'edge' network exists ..."
-  docker network inspect edge >/dev/null 2>&1 || docker network create edge
+  # Routing/TLS and the shared networks live in homelab-infra; the app only
+  # joins them. They are checked, never created here: a stand-in created by
+  # this script would lack homelab-infra's subnet/options and block its stacks.
+  info "Checking homelab-infra external networks ..."
+  MISSING_NETS=()
+  for net in "${EXTERNAL_NETWORKS[@]}"; do
+    docker network inspect "$net" >/dev/null 2>&1 || MISSING_NETS+=("$net")
+  done
+  if (( ${#MISSING_NETS[@]} )); then
+    error "Missing external network(s): ${MISSING_NETS[*]}"
+    error "Bring up homelab-infra's edge and backups stacks first, then re-run."
+    exit 1
+  fi
   info "Restarting stack ..."
   docker compose "${COMPOSE_FILES[@]}" --profile app up -d
   success "Deploy updated. Status:"
@@ -176,8 +190,9 @@ fi
 echo ""
 info "Server bootstrapped. Next steps for Production Deployment:"
 echo ""
-echo "  1. Edge network:  docker network inspect edge >/dev/null 2>&1 || docker network create edge"
-echo "                    (routing/TLS run in the homelab-infra edge stack, not here)"
+echo "  1. Networks:      bring up homelab-infra's edge + backups stacks first; they create"
+echo "                    ${EXTERNAL_NETWORKS[*]}"
+echo "                    (finance_data is created by this stack on its first up)"
 echo "  2. Start infra:   docker compose -f docker-compose.yml up -d postgres kafka minio"
 echo "  3. Pull images:   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile app pull"
 echo "  4. Start app:     docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile app up -d"
