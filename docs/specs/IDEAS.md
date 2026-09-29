@@ -98,7 +98,6 @@ it's ready to build.
   those notifications fail TS narrowing. `[ux]` `[tech-debt]`
 - Frontend declares numeric fields as `number` but ms-investments serialises money as `String`
   over the wire — type mismatch for callers. Align frontend types. `[ux]` `[tech-debt]`
-- `TransactionFilters.tsx:26` writes `page` as the string `'1'` while `TransactionsContent.tsx:43` reads it with `parseAsInteger` — harmless today, a trap tomorrow. `[tech-debt]` `[front]`
 - `lib/format/paymentMethod.ts:1-12` is hardcoded Spanish and falls back to `'Débito automático'` for empty input, bypassing next-intl — a silent mislabel. `[ux]` `[front]`
 - `TransactionsContent.tsx:75-78` `handleBulkCategorise` takes a `catId` it never uses and issues no mutation — bulk categorisation is a no-op. `[bug]` `[front]`
 - `npm run i18n:check` compares locales to each other only, never to the keys referenced from code; two missing keys reached production this way. Add a code-usage scan. `[tech-debt]` `[front]`
@@ -115,7 +114,6 @@ it's ready to build.
 - `TransactionQuery` carries `List<String>`/`String` for what are `CategoryId`, `Cbu` and `PaymentMethod` (R3). Mirroring `PaymentMethod` as a gateway enum would also let the gateway reject a typo'd method instead of forwarding it. `[refactor]` `[gateway]`
 - `findFiltered`'s SQL is asserted as a string and never executed by an engine; an in-memory execution smoke would catch clause-ordering and dialect mistakes within R16. `[tech-debt]` `[finances]`
 - ms-finances `GlobalExceptionHandler:19-24` maps every `IllegalArgumentException` to `404 resource_not_found`, so any stray bad argument anywhere in the service is reported as a missing resource. `[bug]` `[finances]`
-- `TransactionFilters.tsx:26` binds `page` with a string default while `TransactionsContent.tsx:43` binds the same key with `parseAsInteger`. `[tech-debt]` `[front]`
 - `useQueryState('id')` uses nuqs' default `history: 'replace'`, so browser Back does not close the detail panel; `id` is also not cleared when filters or page change. `[ux]` `[front]`
 - `lib/format/paymentMethod.ts` is hardcoded Spanish and falls back to `'Débito automático'` for empty input, bypassing next-intl. `[ux]` `[front]`
 - `TransactionsContent.tsx:73` `handleBulkCategorise` takes a `catId` it never uses and issues no mutation — bulk categorisation is a no-op. `[bug]` `[front]`
@@ -130,7 +128,6 @@ it's ready to build.
 - `GetImportsBffUseCaseImpl`, `GetLoansBffUseCaseImpl`, `CardFigures.toDecimal` and `LoanScheduleSupport.as*` still keep private parse helpers (`parseDecimal`/`parseLong`/`parseInt` copies, R4) — migrate them to `DownstreamPayload`. Supersedes the Round B `CardFigures.toDecimal` and per-impl `parseDecimal` entries. `[refactor]` `[gateway]`
 - Every other gateway adapter still `onErrorReturn`s, and list-returning ones (`InvestmentsGatewayImpl.fetchHoldings`/`fetchPortfolioEvolution`, `FinancesGatewayImpl` list fetches, `NotificationsGatewayImpl.fetchLatest`) turn a 5xx into `[]`, shown as an OK-but-empty table instead of `UNAVAILABLE`. Part B fixed the wealth inputs; the rest need their own pass. `[ux]` `[gateway]`
 - `ms-upload` `GET /runs/by-transaction/{transactionId}` (`StatementController.java:195-204`) takes no `X-User-Id` and checks no ownership — any user can read any transaction's import run — scheduled: separate security hotfix right after C1 merges (user ruling D10, 2026-09-28). `[security]` `[upload]`
-- Sessions never report `current=true` through the BFF: `SessionController` derives it from the `access_token` cookie, which `UsersGatewayImpl.fetchSessions` does not forward. `[bug]` `[gateway]`
 - Fee rows hold one amount/percentage and no concept: transfer fee, card international surcharge, broker sell/market % are dropped; `debitCreditTaxRate` is hard-coded `0.006` although `UserFeesResponse.accounts[].debitCreditTaxRate` carries it. `[ux]` `[gateway]`
 - `PortfolioWebMapper.toPositionSearchResponse` labels the cost basis `marketValue`. `[bug]` `[investments]`
 - `BalanceSnapshotScheduler` (ms-banks) swallows per-user failures with no count or summary line, like the portfolio job did. `[tech-debt]` `[banks]`
@@ -149,6 +146,21 @@ it's ready to build.
 - Bond `currentPrice` unit inconsistency (per-100 quote vs per-1 average cost when unpriced) — Part A must label/handle it. `[ux]` `[investments]`
 - `UpdateHoldingUseCaseImpl` does not check that an edited ticker's price currency matches the holding currency. `[bug]` `[investments]`
 - DDD audit (Task 16) pre-existing findings: `ms-gateway domain/service/MoneyConversion.java` is dead code, a second USD/ARS conversion beside `BffMoneyConverter` (R4) `[refactor]` `[gateway]`; `GetPortfolioSummaryUseCaseImpl.buildBreakdown:72-76` duplicates percentage arithmetic `[refactor]` `[investments]`; use cases `new BrokerFeeNetting()` in CloseHolding/CreateHolding/GetHoldingDetail instead of injecting the domain service `[refactor]` `[investments]`; gateway ports expose raw `Map<String,Object>` and `PortfolioSummary` keys asset type by bare String (R3, low) `[refactor]` `[gateway]`.
+
+### Tech-debt — found during live-testing Round C2 (2026-09-29)
+- Transaction search is accent-sensitive: `cafe` ≠ `Café`. `TransactionRepositoryImpl.java:139` `LOWER(t.description) LIKE LOWER(:q)` and the `searchByDescription` path (`:233`) compare raw text. `[bug]` `[finances]`
+- The omnibar does not route a free-text search to the movements filter: Enter with no highlighted hit does nothing. `[ux]` `[front]`
+- Selecting a parent category does not include its subcategories' movements (`category_id IN (…)` is exact), although subcategories are separate options labelled `Padre / Hijo`. `[ux]` `[finances]`
+- ms-users keeps every login session: the demo user had 131 on 2026-09-29, and the Settings list shows them all. Expire or prune sessions. `[ux]` `[users]`
+- The movements search fetches per keystroke. A shared `useDebouncedValue` would also replace the two private debounce copies in `useSearch` and `useTickerSearch` (R4). `[perf]` `[front]`
+- The local dev DB holds duplicate demo categories (21 × Supermercado/Transporte/Sueldo) from pre-C1 seed runs. Live smoke tolerates them. Reset only on the user's word. The local demo DB also holds one categorisation rule (CONTAINS "COTO" → Supermercado) created by the Task 8 integration check. `[infra]`
+- `UncategorisedBanner.tsx:25` hard-codes `href="/transactions?categories=none"` outside `transactionFilterParams.ts` (R4); build it with nuqs `createSerializer(transactionFilterParams)`. `[tech-debt]` `[front]`
+- A hand-edited `?categories=1106,1106` renders two chips with the same React key, and `?categories=,1106` renders an empty chip and sends the blank to the BFF; dedupe and drop blanks where `categories` is read. `[bug]` `[front]`
+- ms-gateway: the `"access_token"` cookie name is a literal in three places (`JwtAuthFilter`, `SettingsBffController`, `UsersGatewayImpl`); share one constant without putting a transport name in the domain. `[tech-debt]` `[gateway]`
+- ms-gateway (pre-existing, DDD audit): application use-case impls import Spring `@Service`/`@Autowired`. `[tech-debt]` `[gateway]`
+- ms-gateway (pre-existing, DDD audit): outbound ports return untyped `Map<String,Object>` payloads. `[tech-debt]` `[gateway]`
+- ms-gateway (pre-existing, DDD audit): `RuleRow`/`SessionRow` use boxed `Boolean`/`Integer`. `[tech-debt]` `[gateway]`
+- `e2e/live-smoke.spec.ts` uses `.first()` on the Supermercado menu item only because of the duplicate categories above; drop it after a DB reset. `[tech-debt]` `[front]`
 
 ## In progress / promoted
 
