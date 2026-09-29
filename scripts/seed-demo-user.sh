@@ -42,9 +42,16 @@ post() { # post <path> <json>
 }
 
 has() { # has <json> <jq-filter-returning-boolean> [jq args...]
-  local json=$1 filter=$2
+  local json=$1 filter=$2 rc=0
   shift 2
-  jq -e "$@" "$filter" <<<"$json" >/dev/null
+  jq -e "$@" "$filter" <<<"$json" >/dev/null 2>&1 || rc=$?
+  case $rc in
+    0) return 0 ;;
+    1) return 1 ;;
+    *) echo "lookup failed (jq exit $rc) for filter: $filter" >&2
+       echo "response body: $json" >&2
+       exit 1 ;;
+  esac
 }
 
 # Read a count through the BFF, retrying while the stack is still warming up:
@@ -130,7 +137,8 @@ tx() { # tx <from> <to> <amount> <categoryId> <desc> <date> <method>
   local query page
   query=$(jq -rn --arg q "$5" '$q | @uri')
   page=$(get "/api/v1/finances/transactions?from=$6&to=$6&q=$query&size=50")
-  if has "$page" 'any(.data.content[]; (.amount | tonumber) == ($amount | tonumber))' --arg amount "$3"; then
+  if has "$page" 'any(.data.content[]; .description == $desc and .date == $date and (.amount | tonumber) == ($amount | tonumber))' \
+      --arg desc "$5" --arg date "$6" --arg amount "$3"; then
     say "transaction exists: $5 on $6"
     return 0
   fi
